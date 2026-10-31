@@ -208,11 +208,14 @@ export function parseCleanPreview(text: string): CleanReport {
     let rest = itemMatch[2].trim();
     let bytes: number | null = null;
     let sizeText: string | null = null;
-    const sizeMatch = rest.match(SIZE_RE);
-    if (sizeMatch) {
-      bytes = sizeToBytes(sizeMatch[1], sizeMatch[2]);
-      sizeText = `${sizeMatch[1]}${sizeMatch[2].toUpperCase()}`;
-      rest = rest.replace(sizeMatch[0], "").trim();
+    // 用 matchAll 取最后一个尺寸（通常是实际大小），避免行内多个尺寸取错
+    const sizeMatches = [...rest.matchAll(SIZE_RE)];
+    if (sizeMatches.length > 0) {
+      const last = sizeMatches[sizeMatches.length - 1];
+      bytes = sizeToBytes(last[1], last[2]);
+      sizeText = `${last[1]}${last[2].toUpperCase()}`;
+      // 移除所有尺寸匹配，避免残留在名称里
+      rest = rest.replace(new RegExp(SIZE_RE.source, "gi"), " ").trim();
       rest = rest.replace(/[\s,·]+dry\s*$/, "").replace(/[\s,·]+$/, "").trim();
     }
     if (mark === "clean" && bytes !== null) {
