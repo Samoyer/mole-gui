@@ -517,6 +517,23 @@ pub fn run() {
             mo_cache_read,
             mo_cache_write
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::ExitRequested { .. } = event {
+                cleanup_children();
+            }
+            let _ = app_handle;
+        });
+}
+
+/// 清理后台子进程：watch 的 status-go 若还存活就杀掉，
+/// 避免每次启动泄漏一个采集进程（CPU 常年占用）。
+fn cleanup_children() {
+    if let Ok(mut g) = WATCH_CHILD.lock() {
+        if let Some(mut c) = g.take() {
+            let _ = c.kill();
+            let _ = c.wait();
+        }
+    }
 }
