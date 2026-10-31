@@ -209,7 +209,8 @@ export function parseCleanPreview(text: string): CleanReport {
     let bytes: number | null = null;
     let sizeText: string | null = null;
     // 用 matchAll 取最后一个尺寸（通常是实际大小），避免行内多个尺寸取错
-    const sizeMatches = [...rest.matchAll(SIZE_RE)];
+    // matchAll 需要全局正则，SIZE_RE 带 i 不带 g，这里用带 g 的副本
+    const sizeMatches = [...rest.matchAll(new RegExp(SIZE_RE.source, "gi"))];
     if (sizeMatches.length > 0) {
       const last = sizeMatches[sizeMatches.length - 1];
       bytes = sizeToBytes(last[1], last[2]);
