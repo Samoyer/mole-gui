@@ -138,7 +138,7 @@ fn spawn_nice(
         .arg(mo)
         .args(args)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null());
+        .stderr(std::process::Stdio::piped());
     if with_stdin {
         cmd.stdin(std::process::Stdio::piped());
     }
@@ -178,20 +178,48 @@ fn run_mo_heavy(
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
-    let mut stdout_handle = {
+    // 同时取出 stdout 和 stderr（stderr 之前被丢弃，导致 mo 崩溃时无法诊断）
+    let (mut stdout_handle, mut stderr_handle) = {
         let mut g = JOB.lock().map_err(|e| e.to_string())?;
         let (_, c) = g
             .child
             .as_mut()
             .ok_or_else(|| "任务状态异常".to_string())?;
-        c.stdout
+        let so = c
+            .stdout
             .take()
-            .ok_or_else(|| "无法读取子进程输出".to_string())?
+            .ok_or_else(|| "无法读取子进程输出".to_string())?;
+        let se = c.stderr.take();
+        (so, se)
     };
 
     // 独立线程读 stdout，主循环每 100ms 检查一次取消标记，
     // 保证取消能及时生效（mo 扫描期间可能长时间没有输出）
     let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    // stderr 也单独读，避免管道满导致子进程阻塞
+    let (etx, erx) = std::sync::mpsc::channel::<Vec<u8>>();
+    if let Some(mut se) = stderr_handle.take() {
+        std::thread::spawn(move || {
+            let mut buf = [0u8; 16384];
+            loop {
+                match se.read(&mut buf) {
+                    Ok(0) => {
+                        let _ = etx.send(Vec::new());
+                        break;
+                    }
+                    Ok(n) => {
+                        if etx.send(buf[..n].to_vec()).is_err() {
+                            break;
+                        }
+                    }
+                    Err(_) => {
+                        let _ = etx.send(Vec::new());
+                        break;
+                    }
+                }
+            }
+        });
+    }
     std::thread::spawn(move || {
         let mut buf = [0u8; 16384];
         loop {
@@ -266,6 +294,21 @@ fn run_mo_heavy(
         return Err("已取消".to_string());
     }
     let mut text = String::from_utf8_lossy(&out).to_string();
+    // 把 stderr 内容也拼进来（如果非空）
+    let mut err_out: Vec<u8> = Vec::new();
+    while let Ok(chunk) = erx.try_recv() {
+        if chunk.is_empty() {
+            break;
+        }
+        err_out.extend_from_slice(&chunk);
+    }
+    let err_text = String::from_utf8_lossy(&err_out).to_string();
+    if !err_text.trim().is_empty() {
+        if !text.trim().is_empty() {
+            text.push('\n');
+        }
+        text.push_str(&err_text);
+    }
     if text.trim().is_empty() {
         if let Some(code) = exit_code {
             if code != 0 {
