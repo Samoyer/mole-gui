@@ -39,11 +39,24 @@ fn find_mo() -> Result<PathBuf, String> {
         "/opt/homebrew/bin/mo".to_string(),
         "/usr/local/bin/mo".to_string(),
         format!("{home}/.local/bin/mo"),
+        format!("{home}/.cargo/bin/mo"),
     ];
     for c in candidates {
         let p = PathBuf::from(c);
         if p.exists() {
             return Ok(p);
+        }
+    }
+    // 回退到 PATH 查找（注释承诺的行为）：不装在常见位置时也能用
+    if let Ok(path) = std::env::var("PATH") {
+        for dir in path.split(':') {
+            if dir.is_empty() {
+                continue;
+            }
+            let p = PathBuf::from(dir).join("mo");
+            if p.is_file() {
+                return Ok(p);
+            }
         }
     }
     Err("未找到 mo 命令，请先安装 Mole：brew install mole".to_string())

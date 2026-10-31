@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /* ---------- Icons (24x24 stroke, SF-Symbol-like weights) ---------- */
 
@@ -159,15 +159,35 @@ export function ConfirmSheet({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  // 打开原生 dialog：showModal() 让浏览器接管模态、ESC 关闭、焦点管理
+  useEffect(() => {
+    const dlg = dialogRef.current;
+    if (dlg && !dlg.open) dlg.showModal();
+    return () => {
+      if (dlg && dlg.open) dlg.close();
+    };
+  }, []);
+
+  const handleCancel = () => {
+    dialogRef.current?.close();
+    onCancel();
+  };
+  const handleConfirm = () => {
+    dialogRef.current?.close();
+    onConfirm();
+  };
+
   return (
-    <dialog className="confirm-sheet" onClick={(e) => e.stopPropagation()}>
+    <dialog ref={dialogRef} className="confirm-sheet" onClick={(e) => e.stopPropagation()}>
       <h3>{title}</h3>
       <div style={{ margin: "0 0 18px", fontSize: 13, lineHeight: 1.7, color: "var(--text-2)" }}>{body}</div>
       <div className="sheet-actions">
-        <button className="btn ghost sm" onClick={onCancel}>取消</button>
+        <button className="btn ghost sm" onClick={handleCancel}>取消</button>
         <button
           className={destructive ? "btn ghost sm" : "btn primary sm"}
-          onClick={onConfirm}
+          onClick={handleConfirm}
           autoFocus
           style={destructive ? { color: "var(--danger)", borderColor: "color-mix(in srgb, var(--danger) 32%, var(--line))" } : undefined}
         >

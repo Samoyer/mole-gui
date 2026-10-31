@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { formatBytes } from "../lib/mole";
 
 export interface TreemapItem {
@@ -78,15 +78,10 @@ function squarify(
   else squarify(rest, x, y + rowLen, w, h - rowLen, out);
 }
 
-// Apple 风格配色：最大项暖色强调，其余冷蓝渐变；深色模式下收一点亮度
-function color(rank: number, total: number): string {
-  if (rank === 0) return "#f5a623";
-  const dark =
-    typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-  const t = total <= 2 ? 0 : rank / (total - 1);
-  const l = (dark ? 52 : 62) - t * (dark ? 18 : 26);
-  return `hsl(214, ${dark ? 52 : 58}%, ${l}%)`;
+// 颜色改为 CSS class（.tm-0 ~ .tm-5）：跟随外观系统的 accent/accent-2，
+// 切换明暗/配色时自动更新，不再写死 HSL。
+function colorClass(rank: number): string {
+  return `tm-${Math.min(5, Math.max(0, rank))}`;
 }
 
 export default function Treemap({
@@ -96,7 +91,6 @@ export default function Treemap({
   items: TreemapItem[];
   onPick: (path: string, name: string) => void;
 }) {
-  const [hover, setHover] = useState<string | null>(null);
   const W = 1000;
   const H = 230;
 
@@ -116,7 +110,8 @@ export default function Treemap({
   if (rects.length === 0) return null;
 
   return (
-    <div className="card" style={{ padding: 10 }}>
+    <div className="panel panel-pad">
+      <div className="treemap-wrap">
       <svg
         viewBox={`0 0 ${W} ${H}`}
         style={{ display: "block", width: "100%", height: "auto", borderRadius: 8 }}
@@ -128,8 +123,6 @@ export default function Treemap({
               key={r.path}
               style={{ cursor: r.isDir ? "pointer" : "default" }}
               onClick={() => r.isDir && onPick(r.path, r.name)}
-              onMouseEnter={() => setHover(r.path)}
-              onMouseLeave={() => setHover(null)}
             >
               <rect
                 x={r.x + 1}
@@ -137,9 +130,8 @@ export default function Treemap({
                 width={Math.max(0, r.w - 2)}
                 height={Math.max(0, r.h - 2)}
                 rx={5}
-                fill={color(r.rank, rects.length)}
-                opacity={hover === null || hover === r.path ? 1 : 0.55}
-                style={{ transition: "opacity .12s ease" }}
+                className={colorClass(r.rank)}
+                style={{ transition: "fill .3s var(--ease), opacity .12s ease" }}
               />
               <title>{`${r.name} — ${formatBytes(r.size)}`}</title>
               {big && (
@@ -156,6 +148,7 @@ export default function Treemap({
           );
         })}
       </svg>
+      </div>
     </div>
   );
 }

@@ -179,7 +179,7 @@ dialog.confirm-sheet .sheet-actions { display: flex; justify-content: flex-end; 
 .row-right .progress-wrap { width: 100%; }
 .row-right .num { text-align: right; font-variant-numeric: tabular-nums; }
 .row-right .icon-btn { width: 28px; height: 28px; }
-.row-right .pill { justify-content: center; }
+.row-right .pill { width: 100%; justify-content: center; text-align: center; }
 
 /* ---------- 扫描进度条（深度清理/磁盘分析） ---------- */
 .scan-progress { padding: 36px 20px; max-width: 460px; margin: 0 auto; text-align: center; }
@@ -189,3 +189,27 @@ dialog.confirm-sheet .sheet-actions { display: flex; justify-content: flex-end; 
 .scan-progress-bar { height: 7px; border-radius: 999px; background: color-mix(in srgb, var(--text) 9%, transparent); overflow: hidden; }
 .scan-progress-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent)); transition: width 0.4s ease; }
 .scan-progress-foot { margin-top: 12px; font-size: 11.5px; color: var(--muted); }
+
+/* ---------- 进度条状态色（问题 2） ---------- */
+/* pctClass 返回 danger/warn，AnalyzeView 用 orange；统一补齐变体 */
+.progress-track i.danger,
+.progress-track i.red { background: linear-gradient(90deg, color-mix(in srgb, var(--danger) 62%, #fff), var(--danger)); }
+.progress-track i.warn,
+.progress-track i.orange { background: linear-gradient(90deg, color-mix(in srgb, var(--warning) 62%, #fff), var(--warning)); }
+
+/* ---------- Treemap 容器（问题 3） ---------- */
+/* 旧 .card 已废弃，改用 .panel 保证有背景/边框/阴影 */
+
+/* ---------- Treemap 配色跟随主题（问题 14） ---------- */
+/* 用 CSS 变量驱动颜色，切换外观（明暗/配色）时自动跟随；
+ * rect 的 fill 用 var()，浏览器会按当前计算值解析 */
+.treemap-wrap svg rect { transition: fill .3s var(--ease), opacity .12s ease; }
+.treemap-wrap svg g:hover rect { opacity: .55; }
+
+/* 6 级色阶：最大项用辅色强调，其余主色渐变 */
+.tm-0 { fill: var(--accent-2); }
+.tm-1 { fill: var(--accent); }
+.tm-2 { fill: color-mix(in srgb, var(--accent) 82%, var(--accent-2)); }
+.tm-3 { fill: color-mix(in srgb, var(--accent) 66%, var(--accent-2)); }
+.tm-4 { fill: color-mix(in srgb, var(--accent) 52%, var(--accent-2)); }
+.tm-5 { fill: color-mix(in srgb, var(--accent) 42%, var(--accent-2)); }
