@@ -1,0 +1,240 @@
+import { useEffect, useState, type ReactNode } from "react";
+
+/* ---------- Icons (24x24 stroke, SF-Symbol-like weights) ---------- */
+
+type IconProps = { size?: number };
+
+const base = (size = 17) => ({
+  width: size,
+  height: size,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  strokeWidth: 1.8,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+});
+
+export const IconGauge = ({ size }: IconProps = {}) => (
+  <svg {...base(size)}>
+    <path d="M12 20a8 8 0 1 1 8-8" />
+    <path d="M12 12l4.2-3.4" />
+    <path d="M20 15.5a8 8 0 0 1-1.6 2.9" />
+  </svg>
+);
+
+export const IconSparkle = ({ size }: IconProps = {}) => (
+  <svg {...base(size)}>
+    <path d="M11 4l1.7 4.6L17.5 10l-4.8 1.4L11 16l-1.7-4.6L4.5 10l4.8-1.4L11 4z" />
+    <path d="M18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" />
+  </svg>
+);
+
+export const IconTrash = ({ size }: IconProps = {}) => (
+  <svg {...base(size)}>
+    <path d="M5 7h14" />
+    <path d="M9.5 7V5.4c0-.8.7-1.4 1.5-1.4h2c.8 0 1.5.6 1.5 1.4V7" />
+    <path d="M6.5 7l.8 12c.05.9.8 1.6 1.7 1.6h5.9c.9 0 1.65-.7 1.7-1.6l.8-12" />
+    <path d="M10 11.5v5.5M14 11.5v5.5" />
+  </svg>
+);
+
+export const IconDisk = ({ size }: IconProps = {}) => (
+  <svg {...base(size)}>
+    <ellipse cx="12" cy="6.5" rx="7.5" ry="3" />
+    <path d="M4.5 6.5v11c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-11" />
+    <path d="M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3" />
+  </svg>
+);
+
+export const IconSearch = ({ size }: IconProps = {}) => (
+  <svg {...base(size)}>
+    <circle cx="10.5" cy="10.5" r="6.2" />
+    <path d="M15.3 15.3L20 20" />
+  </svg>
+);
+
+export const IconFolder = ({ size }: IconProps = {}) => (
+  <svg {...base(size)}>
+    <path d="M4 7c0-1.1.9-2 2-2h3.6c.6 0 1.1.3 1.5.7l.9 1c.4.5.9.7 1.5.7H18c1.1 0 2 .9 2 2v8c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2V7z" />
+  </svg>
+);
+
+export const IconFile = ({ size }: IconProps = {}) => (
+  <svg {...base(size)}>
+    <path d="M13.5 3.5H7c-1.1 0-2 .9-2 2v13c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V9l-5.5-5.5z" />
+    <path d="M13.5 3.5V9H19" />
+  </svg>
+);
+
+export const IconChip = ({ size }: IconProps = {}) => (
+  <svg {...base(size)}>
+    <rect x="7" y="7" width="10" height="10" rx="2" />
+    <rect x="10.2" y="10.2" width="3.6" height="3.6" rx="0.8" />
+    <path d="M9 3.5V7M15 3.5V7M9 17v3.5M15 17v3.5M3.5 9H7M3.5 15H7M17 9h3.5M17 15h3.5" />
+  </svg>
+);
+
+export const IconReveal = ({ size }: IconProps = {}) => (
+  <svg {...base(size)}>
+    <path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z" />
+    <circle cx="12" cy="12" r="2.8" />
+  </svg>
+);
+
+/* ---------- Health ring ---------- */
+
+export function Ring({
+  value,
+  size = 104,
+  stroke = 8,
+}: {
+  value: number;
+  size?: number;
+  stroke?: number;
+}) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(100, value));
+  const color = pct >= 80 ? "var(--success)" : pct >= 55 ? "var(--warning)" : "var(--danger)";
+  const trackColor = "color-mix(in srgb, var(--muted) 20%, transparent)";
+  return (
+    <div className="health-ring">
+      <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
+        <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke={trackColor}
+            strokeWidth={stroke}
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke={color}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={c}
+            strokeDashoffset={c * (1 - pct / 100)}
+            style={{ transition: "stroke-dashoffset 0.7s ease, stroke 0.4s ease" }}
+          />
+        </svg>
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "grid",
+            placeItems: "center",
+            textAlign: "center",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: -0.6 }}>{pct}</div>
+            <div style={{ fontSize: 10, color: "var(--muted)" }}>健康分</div>
+          </div>
+        </div>
+      </div>
+      <div className="ring-label">系统健康分</div>
+    </div>
+  );
+}
+
+/* ---------- Confirm sheet (native dialog) ---------- */
+
+export function ConfirmSheet({
+  title,
+  body,
+  confirmLabel,
+  destructive,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  body: ReactNode;
+  confirmLabel: string;
+  destructive?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <dialog className="confirm-sheet" onClick={(e) => e.stopPropagation()}>
+      <h3>{title}</h3>
+      <div style={{ margin: "0 0 18px", fontSize: 13, lineHeight: 1.7, color: "var(--text-2)" }}>{body}</div>
+      <div className="sheet-actions">
+        <button className="btn ghost sm" onClick={onCancel}>取消</button>
+        <button
+          className={destructive ? "btn ghost sm" : "btn primary sm"}
+          onClick={onConfirm}
+          autoFocus
+          style={destructive ? { color: "var(--danger)", borderColor: "color-mix(in srgb, var(--danger) 32%, var(--line))" } : undefined}
+        >
+          {confirmLabel}
+        </button>
+      </div>
+    </dialog>
+  );
+}
+
+/* ---------- Small helpers ---------- */
+
+export function Spinner({ label }: { label?: string }) {
+  const [sec, setSec] = useState(0);
+  useEffect(() => {
+    const t = window.setInterval(() => setSec((s) => s + 1), 1000);
+    return () => window.clearInterval(t);
+  }, []);
+  return (
+    <div className="empty-state" style={{ padding: "48px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+      <div className="spinner" style={{ margin: "0 auto 12px" }} />
+      <div>
+        {label ?? "加载中…"}
+        {sec >= 3 ? `（已等待 ${sec} 秒，可先去其他页面）` : ""}
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 扫描进度条 ----------
+ * mo analyze / mo clean 都是扫描结束一次性吐出结果，不流式吐进度，
+ * 拿不到真实百分比。这里用已等待时间驱动一个平滑逼近的进度条：
+ * 指数逼近到 ~86%（20 秒左右），扫描完成时跳 100%，比空转转圈更有真实感。 */
+export function ScanProgress({ label, done }: { label: string; done?: boolean }) {
+  const [pct, setPct] = useState(4);
+  const [sec, setSec] = useState(0);
+  useEffect(() => {
+    const TARGET = 86;
+    const t = window.setInterval(() => {
+      setSec((s) => s + 1);
+      // 指数逼近：每 tick 走剩余距离的 9%，永远到不了 100%，
+      // 扫描结束后外层把 done 置真，这里直接跳到 100%
+      setPct((p) => Math.min(TARGET, p + (TARGET - p) * 0.09));
+    }, 300);
+    return () => window.clearInterval(t);
+  }, []);
+  // 扫描完成后：进度条填满到 100%，随后淡出，由外层切到结果页
+  useEffect(() => {
+    if (done) setPct(100);
+  }, [done]);
+  const elapsed = sec;
+  return (
+    <div className="panel scan-progress" data-drag style={{ opacity: done ? 0.6 : 1, transition: "opacity .4s ease" }}>
+      <div className="scan-progress-head">
+        <span>{done ? "扫描完成" : label}</span>
+        <span className="scan-elapsed">已等待 {elapsed}s</span>
+      </div>
+      <div className="scan-progress-bar">
+        <div className="scan-progress-fill" style={{ width: `${pct}%`, opacity: done ? 0.4 : 1 }} />
+      </div>
+      <div className="scan-progress-foot">扫描过程中可先去其他页面，结果完成后自动回来</div>
+    </div>
+  );
+}
+
+export function pctClass(pct: number): string {
+  if (pct >= 90) return "danger";
+  if (pct >= 70) return "warn";
+  return "";
+}

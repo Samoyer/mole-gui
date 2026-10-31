@@ -1,0 +1,191 @@
+/* ============================================================
+   Mole GUI · Sunny UI 2.0 接入扩展
+   仅放 Tauri 窗口适配与 Sunny UI 未覆盖的业务组件样式，
+   不重写预览原稿的 --mat-* token 或 panel/btn 等原稿组件。
+   ============================================================ */
+
+/* ---------- Tauri 窗口适配 ---------- */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Overlay 标题栏：红绿灯悬浮在内容左上角，topbar 左侧避让 */
+.topbar { padding-left: 84px; }
+
+/* 窗口整体背景跟随当前材质的 --mat-page（已含光晕） */
+.app { min-height: 100vh; }
+
+/* ---------- 健康环（StatusView） ---------- */
+.health-ring { display: flex; align-items: center; gap: 22px; }
+.health-ring svg { flex: none; }
+.health-ring .ring-label { font-size: 11.5px; color: var(--muted); text-align: center; margin-top: 6px; }
+
+/* ---------- 顶部概览条（状态总览） ---------- */
+.hero-strip {
+  display: flex; align-items: center; gap: 26px;
+  padding: 18px 20px;
+}
+.hero-strip .hero-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 26px; flex: 1; min-width: 0; }
+.hero-kv .k { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+.hero-kv .v { font-size: 13.5px; font-weight: 640; color: var(--text); }
+
+/* ---------- 行列表（面板内） ---------- */
+.row-list { display: flex; flex-direction: column; }
+.mrow {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; font-size: 13px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 65%, transparent);
+}
+.mrow:first-child { border-top: 0; }
+.mrow .grow { flex: 1; min-width: 0; }
+.mrow .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow .sub { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+.mrow .num { font-variant-numeric: tabular-nums; color: var(--text-2); font-size: 12px; flex: none; }
+
+/* ---------- 深度清理首屏（无缓存时的开始按钮） ---------- */
+.clean-hero-empty { text-align: center; padding: 52px 24px; }
+.clean-hero-empty .big { font-size: 30px; font-weight: 750; letter-spacing: -.03em; color: var(--text); }
+.clean-hero-empty .desc { font-size: 13px; color: var(--muted); margin-top: 6px; margin-bottom: 20px; line-height: 1.6; }
+
+/* ---------- 清理预览 hero ---------- */
+.clean-hero { display: flex; align-items: center; gap: 16px; padding: 18px 20px; }
+.clean-hero .big { font-size: 30px; font-weight: 750; letter-spacing: -.03em; color: var(--text); }
+.clean-hero .desc { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.clean-hero .hero-actions { margin-left: auto; display: flex; gap: 8px; flex: none; }
+
+/* ---------- 进度条（清理/分析刷新指示） ---------- */
+.progress-track { height: 4px; border-radius: calc(3px * var(--corner-scale, 1)); background: color-mix(in srgb, var(--text) 9%, transparent); overflow: hidden; }
+.progress-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent)); }
+
+/* ---------- 加载 / 错误 ---------- */
+.error-box {
+  padding: 14px 16px; border-radius: calc(12px * var(--corner-scale, 1));
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, var(--line));
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  color: var(--danger); font-size: 12.5px; line-height: 1.6;
+}
+.notice-box {
+  padding: 12px 14px; border-radius: calc(12px * var(--corner-scale, 1));
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  color: var(--text-2); font-size: 12px; line-height: 1.6; margin-bottom: 14px;
+}
+
+/* ---------- 确认弹窗（原生 dialog 增强） ---------- */
+dialog.confirm-sheet {
+  border: 1px solid var(--mat-edge); border-radius: calc(var(--mat-radius, 22px) * var(--corner-scale, 1));
+  background: var(--mat-fill); box-shadow: var(--mat-shadow);
+  backdrop-filter: var(--mat-blur); -webkit-backdrop-filter: var(--mat-blur);
+  padding: 22px 24px; max-width: 420px; width: calc(100% - 48px);
+}
+dialog.confirm-sheet::backdrop { background: rgba(8,14,24,.4); backdrop-filter: blur(6px); }
+dialog.confirm-sheet h3 { margin: 0 0 8px; font-size: 16px; font-weight: 700; letter-spacing: -.015em; }
+dialog.confirm-sheet p { margin: 0 0 18px; font-size: 13px; line-height: 1.7; color: var(--text-2); }
+dialog.confirm-sheet .sheet-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ---------- 树状图（磁盘分析） ---------- */
+.treemap-wrap { width: 100%; }
+.treemap-wrap svg { display: block; width: 100%; }
+
+/* ---------- 应用图标（卸载页） ---------- */
+.app-icon {
+  width: 40px; height: 40px; border-radius: calc(10px * var(--corner-scale, 1));
+  display: grid; place-items: center; flex: none; overflow: hidden;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--accent) 22%, var(--surface-2)), var(--surface-2));
+  border: 1px solid var(--mat-control-edge);
+}
+.app-icon img { width: 100%; height: 100%; object-fit: contain; }
+.app-icon .glyph { font-size: 18px; font-weight: 700; color: var(--accent); }
+
+/* ---------- 卸载页右侧详情 ---------- */
+.app-detail { display: flex; flex-direction: column; gap: 12px; }
+.app-detail .detail-icon { width: 56px; height: 56px; border-radius: calc(14px * var(--corner-scale, 1)); }
+.app-detail .detail-name { font-size: 16px; font-weight: 700; letter-spacing: -.015em; }
+.app-detail .detail-path { font-size: 11.5px; color: var(--muted); font-family: ui-monospace, Consolas, monospace; word-break: break-all; }
+
+/* ---------- 磁盘分析分段控制 ---------- */
+.split-view { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+
+/* ---------- 拖拽窗口：让 panel/sidebar/topbar 空白可拖 ---------- */
+/* Sunny UI 的 panel/sidebar 带 backdrop-filter 形成合成层，
+   原生 drag-region 失效，统一用 JS startDragging() 接管（见 App.tsx） */
+.panel[data-drag], .sidebar[data-drag], .topbar[data-drag] { cursor: default; }
+
+/* ---------- 滚动条 ---------- */
+.content::-webkit-scrollbar { width: 8px; }
+.content::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 30%, transparent); border-radius: 4px; }
+
+/* ---------- 窄屏：抽屉导航 ---------- */
+@media (max-width: 720px) {
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 264px; z-index: 80;
+    transform: translateX(-100%); transition: transform .24s var(--ease);
+  }
+  .sidebar.open { transform: none; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  .menu-backdrop { display: block; position: fixed; inset: 0; background: rgba(8,14,24,.4); z-index: 70; }
+  .topbar { padding-left: 16px; }
+  .split-view { grid-template-columns: 1fr; }
+  .hero-info { grid-template-columns: 1fr !important; }
+}
+
+/* ---------- 模块标题（原稿未提供，业务层统一） ---------- */
+.section-title {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  font-size: 15px; font-weight: 700; letter-spacing: -0.015em; color: var(--text);
+}
+.section-title .hint { font-size: 11.5px; color: var(--muted); font-weight: 400; }
+
+/* ---------- 面包屑 ---------- */
+.crumbs { font-size: 13px; color: var(--text-2); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.crumbs button { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; font: inherit; }
+.crumbs .sep { color: var(--muted); }
+
+/* ---------- 代码/预格式化输出 ---------- */
+.pre-output {
+  font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-all; color: var(--text-2);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  padding: 12px; border-radius: calc(12px * var(--corner-scale, 1));
+  overflow: auto;
+}
+
+/* ---------- Spinner ---------- */
+.spinner {
+  width: 28px; height: 28px; border-radius: 50%; flex: none;
+  border: 3px solid color-mix(in srgb, var(--muted) 25%, transparent);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- 行选中态（卸载页） ---------- */
+.mrow.selected { background: var(--mat-active-bg); }
+.mrow.clickable { cursor: pointer; }
+
+/* ---------- 页面容器 ---------- */
+.page-body { display: flex; flex-direction: column; gap: 18px; }
+
+/* ---------- 行内右半区对齐（磁盘分析/清理） ---------- */
+/* 用固定列宽的 grid 替代 flex，保证每行右侧元素纵向对齐 */
+.row-right {
+  display: grid;
+  grid-template-columns: 56px 64px 30px 48px;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.row-right .progress-wrap { width: 100%; }
+.row-right .num { text-align: right; font-variant-numeric: tabular-nums; }
+.row-right .icon-btn { width: 28px; height: 28px; }
+.row-right .pill { justify-content: center; }
+
+/* ---------- 扫描进度条（深度清理/磁盘分析） ---------- */
+.scan-progress { padding: 36px 20px; max-width: 460px; margin: 0 auto; text-align: center; }
+.scan-progress-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.scan-progress-head span:first-child { font-size: 14px; font-weight: 640; color: var(--text); }
+.scan-elapsed { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.scan-progress-bar { height: 7px; border-radius: 999px; background: color-mix(in srgb, var(--text) 9%, transparent); overflow: hidden; }
+.scan-progress-fill { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 62%, #fff), var(--accent)); transition: width 0.4s ease; }
+.scan-progress-foot { margin-top: 12px; font-size: 11.5px; color: var(--muted); }
