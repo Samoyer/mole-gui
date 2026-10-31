@@ -149,10 +149,10 @@ fn spawn_nice(
         .arg(mo)
         .args(args)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    if with_stdin {
-        cmd.stdin(std::process::Stdio::piped());
-    }
+        .stderr(std::process::Stdio::piped())
+        // stdin 显式设为 null：mo 检测到非 TTY 会自动进入非交互模式，
+        // 避免继承父进程 stdin 导致意外交互
+        .stdin(if with_stdin { std::process::Stdio::piped() } else { std::process::Stdio::null() });
     cmd.spawn().map_err(|e| format!("无法启动 mo：{e}"))
 }
 
@@ -478,9 +478,9 @@ fn mo_clean_preview(id: u64) -> Result<String, String> {
 
 #[tauri::command]
 fn mo_clean_run(id: u64) -> Result<String, String> {
-    // "y" answers mo's interactive confirmation; the frontend gates this
-    // behind an explicit user confirmation sheet.
-    run_mo_heavy(id, &["clean"], Some("y\n"), false)
+    // mo 在管道输入（非 TTY）时自动进入非交互模式，不需要显式确认。
+    // 前端在用户点击"立即清理"前已通过 ConfirmSheet 二次确认。
+    run_mo_heavy(id, &["clean"], None, false)
 }
 
 #[tauri::command]
@@ -500,7 +500,7 @@ fn mo_uninstall_run(name: String, permanent: bool, id: u64) -> Result<String, St
     } else {
         vec!["uninstall", &name]
     };
-    run_mo_heavy(id, &args, Some("y\n"), false)
+    run_mo_heavy(id, &args, None, false)
 }
 
 #[tauri::command]
