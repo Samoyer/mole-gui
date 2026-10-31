@@ -63,6 +63,11 @@ export function persistAnalyze(key: string, data: AnalyzeData): void {
 
 const STATUS_PERSIST_TTL = 6 * 60 * 60 * 1000;
 
+// 写盘节流：watch 流每 2 秒推送一帧，但每帧都写盘会持续占用 IO。
+// 只在距上次写入超过 60 秒时才落盘，读取时仍用 ≤6h 的旧结果。
+let lastStatusWriteAt = 0;
+export const STATUS_PERSIST_INTERVAL = 60 * 1000;
+
 export async function readStatusPersist(): Promise<{ data: StatusData; at: number } | null> {
   try {
     const raw = await moCacheRead("status-last");
@@ -77,6 +82,8 @@ export async function readStatusPersist(): Promise<{ data: StatusData; at: numbe
 }
 
 export function persistStatus(data: StatusData): void {
+  if (Date.now() - lastStatusWriteAt < STATUS_PERSIST_INTERVAL) return;
+  lastStatusWriteAt = Date.now();
   moCacheWrite("status-last", JSON.stringify({ data, at: Date.now() })).catch(() => {});
 }
 

@@ -352,6 +352,13 @@ export default function UninstallView() {
         </div>
       </div>
 
+      {phase === "running" && (
+        <div className="empty-state" style={{ padding: "48px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+          <div className="spinner" style={{ margin: "0 auto 12px" }} />
+          <div>正在卸载 {selected?.name}…</div>
+        </div>
+      )}
+
       {phase === "confirm" && selected && (
         <ConfirmSheet
           title={permanent ? "彻底删除应用" : "卸载应用"}

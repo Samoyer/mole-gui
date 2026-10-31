@@ -137,7 +137,8 @@ export default function AnalyzeView() {
   };
 
   const entries = data?.entries ?? [];
-  const max = Math.max(1, ...entries.map((e) => e.size));
+  // 用 reduce 代替 spread，避免 entries 过大时触发调用栈限制
+  const max = entries.reduce((acc, e) => Math.max(acc, e.size), 1);
 
   const reveal = (ev: { stopPropagation?: () => void }, path: string) => {
     ev.stopPropagation?.();

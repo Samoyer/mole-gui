@@ -114,6 +114,17 @@ fn strip_ansi(text: &str) -> String {
                         break;
                     }
                 }
+            } else if chars.peek() == Some(&']') {
+                // OSC 序列：ESC ] ... BEL(0x07) 或 ST(ESC \)
+                chars.next();
+                loop {
+                    let Some(c2) = chars.next() else { break };
+                    if c2 == '\u{07}' { break; }
+                    if c2 == '\u{1b}' {
+                        if chars.peek() == Some(&'\\') { chars.next(); }
+                        break;
+                    }
+                }
             } else {
                 chars.next();
             }

@@ -21,7 +21,9 @@ export const moCacheRead = (name: string) =>
 export const moCacheWrite = (name: string, content: string) =>
   invoke<void>("mo_cache_write", { name, content });
 
-// 重型任务 id：同一毫秒内自增保证唯一，用于「取消自己的任务」
+// 重型任务 id：毫秒时间戳 ×1000 加自增计数，同一毫秒内最多 1000 个不碰撞。
+// 1000 次之后计数回绕，但回绕到的是同一毫秒内已用过的值——实践中一次
+// 运行不会在同一毫秒发起 1000 个任务，风险可忽略。用于「取消自己的任务」。
 let jobCounter = 0;
 export function nextJobId(): number {
   return Date.now() * 1000 + (jobCounter++ % 1000);

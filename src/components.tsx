@@ -224,13 +224,15 @@ export function Spinner({ label }: { label?: string }) {
 export function ScanProgress({ label, done }: { label: string; done?: boolean }) {
   const [pct, setPct] = useState(4);
   const [sec, setSec] = useState(0);
+  const startedAt = useRef<number>(Date.now());
   useEffect(() => {
     const TARGET = 86;
     const t = window.setInterval(() => {
-      setSec((s) => s + 1);
       // 指数逼近：每 tick 走剩余距离的 9%，永远到不了 100%，
       // 扫描结束后外层把 done 置真，这里直接跳到 100%
       setPct((p) => Math.min(TARGET, p + (TARGET - p) * 0.09));
+      // 用真实经过时间算秒数，避免 300ms tick 被当成 1 秒的误差
+      setSec(Math.round((Date.now() - startedAt.current) / 1000));
     }, 300);
     return () => window.clearInterval(t);
   }, []);

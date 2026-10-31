@@ -8,7 +8,7 @@ export type Theme = "light" | "dark";
 export type Material = typeof materials[number]["id"];
 export type Color = typeof accents[number]["id"];
 export type Corner = typeof corners[number]["id"];
-let prefix = "sunny-ui";
+let prefix = "mole-ui";
 let disposeGlass: (() => void) | undefined;
 const eventName = "sunny-ui:appearance";
 function read(key: string) { try { return localStorage.getItem(`${prefix}-${key}`); } catch { return null; } }
