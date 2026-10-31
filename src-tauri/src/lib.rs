@@ -500,7 +500,9 @@ fn mo_uninstall_run(name: String, permanent: bool, id: u64) -> Result<String, St
     } else {
         vec!["uninstall", &name]
     };
-    run_mo_heavy(id, &args, None, false)
+    // mo uninstall 不像 mo clean 那样能自动非交互：它明确要求交互式确认。
+    // 必须在 stdin 喂 "y" 才能通过，否则会拒绝执行。
+    run_mo_heavy(id, &args, Some("y\n"), false)
 }
 
 #[tauri::command]
