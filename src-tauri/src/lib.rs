@@ -326,6 +326,8 @@ fn run_mo_heavy(
     });
 
     let mut out: Vec<u8> = Vec::new();
+    // analyze --json 的全量输出驻留内存；给个硬顶防病态情况吃光内存
+    const MAX_HEAVY_OUTPUT: usize = 64 * 1024 * 1024;
     // 看门狗：stdout 静默超过 120 秒就判定扫描挂起/通道断裂，
     // 不再让前端无限等待（历史上出现过子进程被信号杀死但 invoke 悬挂 40 分钟的情况）
     // clean --dry-run 冷启动实测约 150s 且 stdout 全缓冲（结束前零输出），
@@ -349,6 +351,15 @@ fn run_mo_heavy(
                     break false;
                 }
                 out.extend_from_slice(&chunk);
+                if out.len() > MAX_HEAVY_OUTPUT {
+                    if let Ok(mut g) = JOB.lock() {
+                        if let Some((_, mut c)) = g.child.take() {
+                            let _ = c.kill();
+                            let _ = c.wait();
+                        }
+                    }
+                    return Err("输出过大（超过 64MB），已自动终止任务。".to_string());
+                }
                 line_buf.extend_from_slice(&chunk);
                 while let Some(pos) = line_buf.iter().position(|&b| b == b'\n') {
                     let line: Vec<u8> = line_buf.drain(..=pos).collect();
