@@ -35,6 +35,16 @@ function formatAgo(at: number): string {
 
 type InitPhase = "init" | "scanning" | "ready" | "refreshing";
 
+// 概览扫描的模块级 session：切到其他 tab 时组件卸载，但扫描在后台
+// 继续（结果照常写入缓存），回到本页时重新接上进度与结果。
+// 之前卸载即取消，"可先去其他页面"的承诺对磁盘分析是空话。
+const overviewSession: {
+  jobId: number;
+  inFlight: boolean;
+  startedAt: number;
+  error: string | null;
+} = { jobId: 0, inFlight: false, startedAt: 0, error: null };
+
 export default function AnalyzeView() {
   const [data, setData] = useState<AnalyzeData | null>(null);
   const [staleAt, setStaleAt] = useState<number | null>(null);
@@ -46,6 +56,7 @@ export default function AnalyzeView() {
   const jobId = useRef(0);
   const jobInFlight = useRef(false);
   const hasContent = useRef(false);
+  const scanStartedAt = useRef(0);
 
   const load = useCallback(async (path: string | null, force = false) => {
     const key = path ?? analyzeOverviewKey;
@@ -60,7 +71,6 @@ export default function AnalyzeView() {
       }
       if (!hit) {
         const disk = await readAnalyzePersist(key);
-        if (!mounted.current) return;
         if (disk) {
           setAnalyzeCached(key, disk.data);
           hasContent.current = true;
@@ -73,13 +83,20 @@ export default function AnalyzeView() {
     const id = nextJobId();
     jobId.current = id;
     jobInFlight.current = true;
+    scanStartedAt.current = Date.now();
     setScanDone(false);
     if (!hasContent.current) setPhase("scanning");
     else setPhase("refreshing");
     setError(null);
+    const isOverview = path === null;
+    if (isOverview) {
+      overviewSession.inFlight = true;
+      overviewSession.jobId = id;
+      overviewSession.startedAt = scanStartedAt.current;
+      overviewSession.error = null;
+    }
     try {
       const raw = await moAnalyze(path ?? undefined, id);
-      if (!mounted.current) return;
       const parsed = parseJson<AnalyzeData>(raw);
       setAnalyzeCached(key, parsed);
       persistAnalyze(key, parsed);
@@ -92,12 +109,15 @@ export default function AnalyzeView() {
         if (mounted.current) setPhase("ready");
       }, 600);
     } catch (e) {
-      if (mounted.current && !isCancelError(e)) {
+      // 卸载后完成的概览扫描把错误留给重挂载的组件展示
+      if (isOverview && !mounted.current && !isCancelError(e)) overviewSession.error = String(e);
+      if (!isCancelError(e)) {
         setError(String(e));
         if (!hasContent.current) setPhase("init");
       }
     } finally {
       jobInFlight.current = false;
+      if (isOverview) overviewSession.inFlight = false;
     }
   }, []);
 
@@ -121,8 +141,43 @@ export default function AnalyzeView() {
     });
     return () => {
       mounted.current = false;
-      if (jobInFlight.current) moJobCancel(jobId.current).catch(() => {});
+      // 概览扫描属于后台 session，不随组件卸载取消
+      if (jobInFlight.current && jobId.current !== overviewSession.jobId) moJobCancel(jobId.current).catch(() => {});
     };
+  }, []);
+
+  // 回到本页时概览扫描还在跑：重新接上进度面板，完成后自动就绪
+  useEffect(() => {
+    if (!overviewSession.inFlight) return;
+    jobId.current = overviewSession.jobId;
+    jobInFlight.current = true;
+    scanStartedAt.current = overviewSession.startedAt;
+    setScanDone(false);
+    setPhase("scanning");
+    const timer = window.setInterval(() => {
+      if (overviewSession.inFlight) return;
+      window.clearInterval(timer);
+      jobInFlight.current = false;
+      if (overviewSession.error) {
+        if (!hasContent.current) {
+          setError(overviewSession.error);
+          setPhase("init");
+        }
+        return;
+      }
+      const hit = getAnalyzeCached(analyzeOverviewKey);
+      if (hit) {
+        setStaleAt(null);
+        hasContent.current = true;
+        setData(hit.data);
+        setScanDone(true);
+        window.setTimeout(() => {
+          if (mounted.current) setPhase("ready");
+        }, 600);
+      }
+    }, 300);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const drill = (path: string, label: string) => {
@@ -173,7 +228,26 @@ export default function AnalyzeView() {
       </div>
 
       {error && <div className="error-box">{error}</div>}
-      {phase === "scanning" && <ScanProgress label="正在扫描磁盘占用…" done={scanDone} jobId={jobId.current} />}
+      {phase === "scanning" && (
+        <ScanProgress
+          label="正在扫描磁盘占用…"
+          done={scanDone}
+          jobId={jobId.current}
+          startedAt={scanStartedAt.current || undefined}
+          onCancel={() => moJobCancel(jobId.current).catch(() => {})}
+        />
+      )}
+
+      {phase === "refreshing" && (
+        <div style={{ marginBottom: 14 }}>
+          <ScanProgress
+            label="正在重新扫描磁盘占用…"
+            jobId={jobId.current}
+            startedAt={scanStartedAt.current || undefined}
+            onCancel={() => moJobCancel(jobId.current).catch(() => {})}
+          />
+        </div>
+      )}
 
       {phase === "init" && !data && (
         <section className="panel" data-drag>
