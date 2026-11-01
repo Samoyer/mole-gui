@@ -222,10 +222,13 @@ export function Spinner({ label }: { label?: string }) {
  * mo clean 会按分类渐进输出，jobId 匹配的进度事件到达时显示真实百分比；
  * analyze 没有任何流式输出，收不到事件就显示不定态进度条 + 真实等待秒数，
  * 不伪造百分比。 */
-export function ScanProgress({ label, done, jobId, onCancel }: { label: string; done?: boolean; jobId?: number; onCancel?: () => void }) {
+export function ScanProgress({ label, done, jobId, onCancel, startedAt: startedAtProp }: { label: string; done?: boolean; jobId?: number; onCancel?: () => void; startedAt?: number }) {
   const [sec, setSec] = useState(0);
   const [real, setReal] = useState<{ done: number; total: number; label: string } | null>(null);
   const startedAt = useRef<number>(Date.now());
+  useEffect(() => {
+    if (startedAtProp) startedAt.current = startedAtProp;
+  }, [startedAtProp]);
   useEffect(() => {
     const t = window.setInterval(() => {
       setSec(Math.round((Date.now() - startedAt.current) / 1000));

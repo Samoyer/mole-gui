@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import {
   moCleanPreview,
   moCleanRun,
@@ -22,147 +22,167 @@ type InitPhase = "init" | "scanning" | "preview" | "confirm" | "running" | "done
 
 const MARK_TEXT = { clean: "↳", ok: "✓", skip: "◎", info: "i" } as const;
 
-export default function CleanView() {
-  const [phase, setPhase] = useState<InitPhase>("init");
-  const [report, setReport] = useState<CleanReport | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [output, setOutput] = useState("");
-  const [scanDone, setScanDone] = useState(false);
-  const mounted = useRef(true);
-  const scanId = useRef(0);
-  const scanInFlight = useRef(false);
-  const hasContent = useRef(false);
+// 扫描/清理状态放在模块级 store：切到其他 tab 时 CleanView 卸载，
+// 但任务在后台继续跑，回来时进度和结果都还在。
+// 之前卸载时的 moJobCancel 会把后台扫描甚至正在执行的真实清理杀掉。
+type CleanState = {
+  phase: InitPhase;
+  report: CleanReport | null;
+  output: string;
+  error: string | null;
+  scanDone: boolean;
+  scanId: number;
+  scanStartedAt: number;
+  scanInFlight: boolean;
+  refreshing: boolean;
+  hasContent: boolean;
+};
 
-  const scan = useCallback(async (force = false) => {
-    if (!force) {
-      const hit = getCleanCached();
-      if (hit && Date.now() - hit.at < CLEAN_CACHE_TTL) {
-        setReport(hit.report);
-        setPhase("preview");
-        return;
-      }
-      if (!hit) {
-        const disk = await readCleanPersist();
-        if (!mounted.current) return;
-        if (disk) {
-          setCleanCached(disk.report);
-          hasContent.current = true;
-          setReport(disk.report);
-          setPhase("preview");
-        }
-      }
-    }
-    const id = nextJobId();
-    scanId.current = id;
-    scanInFlight.current = true;
-    if (hasContent.current) {
-      setRefreshing(true);
-    } else {
-      setScanDone(false);
-      setPhase("scanning");
-    }
-    setError(null);
-    let errored = false;
-    try {
-      const text = await moCleanPreview(id);
-      if (!mounted.current) return;
-      const parsed = parseCleanPreview(text);
-      setCleanCached(parsed);
-      persistClean(parsed);
-      hasContent.current = true;
-      setReport(parsed);
-      // 扫描成功：先把进度条推到 100%，短暂展示后切换到结果页
-      setScanDone(true);
-      window.setTimeout(() => {
-        if (mounted.current) setPhase("preview");
-      }, 600);
-    } catch (e) {
-      if (mounted.current && !isCancelError(e)) {
-        errored = true;
-        setError(String(e));
-        if (!report) {
-          setOutput(String(e));
-          setPhase("done");
-        }
-      }
-    } finally {
-      scanInFlight.current = false;
-      if (mounted.current) {
-        setRefreshing(false);
-        // 出错时保留错误页面，不能把 phase 重置回 init 把错误吞掉
-        if (!errored && !hasContent.current && !report) setPhase("init");
-      }
-    }
-  }, []);
+const cleanStore = {
+  state: {
+    phase: "init",
+    report: null,
+    output: "",
+    error: null,
+    scanDone: false,
+    scanId: 0,
+    scanStartedAt: 0,
+    scanInFlight: false,
+    refreshing: false,
+    hasContent: false,
+  } as CleanState,
+  listeners: new Set<() => void>(),
+};
 
-  useEffect(() => {
-    mounted.current = true;
-    hasContent.current = !!getCleanCached();
-    if (hasContent.current) {
-      const hit = getCleanCached()!;
-      setReport(hit.report);
-      setPhase("preview");
+function setClean(patch: Partial<CleanState>) {
+  cleanStore.state = { ...cleanStore.state, ...patch };
+  cleanStore.listeners.forEach((l) => l());
+}
+
+function subscribeClean(fn: () => void) {
+  cleanStore.listeners.add(fn);
+  return () => {
+    cleanStore.listeners.delete(fn);
+  };
+}
+
+const getCleanSnapshot = () => cleanStore.state;
+
+let cacheInitialized = false;
+
+async function startScan(force = false) {
+  if (cleanStore.state.scanInFlight) return;
+  if (!force) {
+    const hit = getCleanCached();
+    if (hit && Date.now() - hit.at < CLEAN_CACHE_TTL) {
+      setClean({ report: hit.report, hasContent: true, phase: "preview" });
       return;
     }
-    readCleanPersist().then((disk) => {
-      if (!mounted.current || !disk) return;
-      setCleanCached(disk.report);
-      hasContent.current = true;
-      setReport(disk.report);
-      setPhase("preview");
-    });
-    return () => {
-      mounted.current = false;
-      if (scanInFlight.current) moJobCancel(scanId.current).catch(() => {});
-    };
+    if (!hit && !cleanStore.state.hasContent) {
+      const disk = await readCleanPersist();
+      if (disk) {
+        setCleanCached(disk.report);
+        setClean({ report: disk.report, hasContent: true, phase: "preview" });
+      }
+    }
+  }
+  const id = nextJobId();
+  if (cleanStore.state.hasContent) {
+    setClean({ scanId: id, scanStartedAt: Date.now(), scanInFlight: true, refreshing: true, error: null });
+  } else {
+    setClean({ scanId: id, scanStartedAt: Date.now(), scanInFlight: true, scanDone: false, phase: "scanning", error: null });
+  }
+  try {
+    const text = await moCleanPreview(id);
+    const parsed = parseCleanPreview(text);
+    setCleanCached(parsed);
+    persistClean(parsed);
+    // 扫描成功：进度条推到 100%，短暂展示后切到结果页
+    setClean({ report: parsed, hasContent: true, scanDone: true, scanInFlight: false, refreshing: false });
+    window.setTimeout(() => {
+      const cur = cleanStore.state;
+      if (cur.scanId === id && cur.phase === "scanning" && cur.scanDone) setClean({ phase: "preview" });
+    }, 600);
+  } catch (e) {
+    if (!isCancelError(e)) {
+      const msg = String(e);
+      setClean({ error: msg, scanInFlight: false, refreshing: false });
+      if (!cleanStore.state.report) {
+        setClean({ output: msg, phase: "done" });
+      }
+    } else {
+      // 用户主动取消：有旧结果回结果页，没有则回起始页
+      setClean({ scanInFlight: false, refreshing: false, scanDone: false });
+      if (!cleanStore.state.hasContent) setClean({ phase: "init" });
+    }
+  }
+}
+
+function cancelCleanScan() {
+  if (cleanStore.state.scanInFlight) {
+    moJobCancel(cleanStore.state.scanId).catch(() => {});
+  }
+}
+
+async function runCleanAction() {
+  const id = nextJobId();
+  setClean({ phase: "running", output: "", scanId: id, scanInFlight: true });
+  try {
+    const text = await moCleanRun(id);
+    setClean({ output: text, phase: "done", scanInFlight: false });
+  } catch (e) {
+    setClean({ output: String(e), phase: "done", scanInFlight: false });
+  }
+}
+
+export default function CleanView() {
+  const snap = useSyncExternalStore(subscribeClean, getCleanSnapshot);
+
+  useEffect(() => {
+    if (cacheInitialized) return;
+    cacheInitialized = true;
+    (async () => {
+      const hit = getCleanCached();
+      if (hit) {
+        setClean({ report: hit.report, hasContent: true });
+        if (cleanStore.state.phase === "init") setClean({ phase: "preview" });
+        return;
+      }
+      const disk = await readCleanPersist();
+      if (disk && !cleanStore.state.hasContent) {
+        setCleanCached(disk.report);
+        setClean({ report: disk.report, hasContent: true });
+        if (cleanStore.state.phase === "init") setClean({ phase: "preview" });
+      }
+    })();
   }, []);
 
-  const runClean = async () => {
-    setPhase("running");
-    setOutput("");
-    const id = nextJobId();
-    scanId.current = id;
-    scanInFlight.current = true;
-    try {
-      const text = await moCleanRun(id);
-      if (mounted.current) {
-        setOutput(text);
-        setPhase("done");
-      }
-    } catch (e) {
-      if (mounted.current) {
-        setOutput(String(e));
-        setPhase("done");
-      }
-    } finally {
-      scanInFlight.current = false;
-    }
-  };
-
-  if (phase === "scanning") return <ScanProgress label="正在扫描可清理的项目…" done={scanDone} jobId={scanId.current} />;
-  if (error && !report)
+  if (snap.phase === "scanning")
+    return <ScanProgress label="正在扫描可清理的项目…" done={snap.scanDone} jobId={snap.scanId} onCancel={cancelCleanScan} startedAt={snap.scanStartedAt || undefined} />;
+  if (snap.error && !snap.report)
     return (
       <div className="error-box">
-        {error}
-        <button className="btn ghost sm" style={{ marginLeft: 12 }} onClick={() => scan(true)}>
+        {snap.error}
+        <button className="btn ghost sm" style={{ marginLeft: 12 }} onClick={() => startScan(true)}>
           重试
         </button>
       </div>
     );
-  if (phase === "init" && !report) {
+  if (snap.phase === "init" && !snap.report) {
     return (
       <section className="panel clean-hero" data-drag>
         <div className="clean-hero-empty">
           <div className="big">{formatBytes(0)}</div>
           <div className="desc">点击开始扫描，查找可清理的缓存、日志和临时文件</div>
-          <button className="btn primary" onClick={() => scan(true)}>开始扫描</button>
+          <button className="btn primary" onClick={() => startScan(true)}>开始扫描</button>
         </div>
       </section>
     );
   }
-  if (!report) return null;
+  if (!snap.report) return null;
 
+  const report = snap.report;
+  const phase = snap.phase;
   const showHero = phase === "preview" || phase === "confirm";
 
   return (
@@ -183,17 +203,17 @@ export default function CleanView() {
               {getCleanCached()
                 ? ` · 扫描于 ${new Date(getCleanCached()!.at).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`
                 : ""}
-              {refreshing ? " · 正在重新扫描…" : ""}
+              {snap.refreshing ? " · 正在重新扫描…" : ""}
             </div>
           </div>
           <div className="hero-actions">
-            <button className="btn ghost sm" onClick={() => scan(true)} disabled={phase !== "preview" || refreshing}>
+            <button className="btn ghost sm" onClick={() => startScan(true)} disabled={phase !== "preview" || snap.refreshing}>
               重新扫描
             </button>
             <button
               className="btn primary sm"
-              onClick={() => setPhase("confirm")}
-              disabled={phase !== "preview" || refreshing}
+              onClick={() => setClean({ phase: "confirm" })}
+              disabled={phase !== "preview" || snap.refreshing}
             >
               立即清理
             </button>
@@ -235,8 +255,9 @@ export default function CleanView() {
       {phase === "running" && (
         <ScanProgress
           label="正在清理，请稍候…"
-          jobId={scanId.current}
-          onCancel={() => moJobCancel(scanId.current).catch(() => {})}
+          jobId={snap.scanId}
+          startedAt={snap.scanStartedAt || undefined}
+          onCancel={cancelCleanScan}
         />
       )}
 
@@ -244,10 +265,10 @@ export default function CleanView() {
         <>
           <div className="section-title" style={{ margin: "22px 0 12px" }}>执行结果</div>
           <section className="panel panel-pad">
-            <pre className="pre-output" style={{ margin: 0, fontFamily: "ui-monospace, Consolas, monospace", fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{output || "（无输出）"}</pre>
+            <pre className="pre-output" style={{ margin: 0, fontFamily: "ui-monospace, Consolas, monospace", fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{snap.output || "（无输出）"}</pre>
           </section>
           <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
-            <button className="btn primary" onClick={() => scan(true)}>重新扫描</button>
+            <button className="btn primary" onClick={() => startScan(true)}>重新扫描</button>
           </div>
         </>
       )}
@@ -264,8 +285,8 @@ export default function CleanView() {
           }
           confirmLabel="清理"
           destructive
-          onConfirm={runClean}
-          onCancel={() => setPhase("preview")}
+          onConfirm={runCleanAction}
+          onCancel={() => setClean({ phase: "preview" })}
         />
       )}
     </>
