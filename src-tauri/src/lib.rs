@@ -180,9 +180,12 @@ fn emit_clean_progress(app: &AppHandle, id: u64, raw_line: &[u8], cat_done: &mut
     );
 }
 
-/// 执行重型 mo 任务：全局串行（排队等前一个完成）、可取消。
-/// cancellable=false 用于真实删除（clean/uninstall），取消信号会被忽略，
-/// 防止删除进行到一半被中断。
+/// 执行重型 mo 任务：全局串行（排队等前一个完成）。
+/// 取消信号对任何任务都生效（用户显式取消优先于"删除不可中断"：
+/// 卡在 sudo 授权框上的删除任务只能由用户决定去留）。
+/// cancellable=false 只影响看门狗：真实删除（clean/uninstall）不会因
+/// stdout 静默被自动杀掉——自动杀会产生"删到一半"的不可知状态，
+/// 改为发提醒事件让用户自己决定是否取消。
 fn run_mo_heavy(
     app: AppHandle,
     id: u64,
@@ -284,12 +287,13 @@ fn run_mo_heavy(
     // 120s 静默阈值会误杀合法慢扫描；300s 仍能兜底历史上的 40 分钟悬挂
     let silence_limit = std::time::Duration::from_secs(300);
     let mut last_output_at = std::time::Instant::now();
+    let mut warned_silence = false;
     let mut line_buf: Vec<u8> = Vec::new();
     let mut cat_done: usize = 0;
     let cancelled = loop {
         {
             let g = JOB.lock().map_err(|e| e.to_string())?;
-            if cancellable && g.cancelled.contains(&id) {
+            if g.cancelled.contains(&id) {
                 break true;
             }
         }
@@ -305,17 +309,31 @@ fn run_mo_heavy(
                     emit_clean_progress(&app, id, &line, &mut cat_done);
                 }
                 last_output_at = std::time::Instant::now();
+                warned_silence = false;
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                 if last_output_at.elapsed() > silence_limit {
-                    // 杀进程、清状态，让串行队列恢复可用
-                    if let Ok(mut g) = JOB.lock() {
-                        if let Some((_, mut c)) = g.child.take() {
-                            let _ = c.kill();
-                            let _ = c.wait();
+                    if cancellable {
+                        // 杀进程、清状态，让串行队列恢复可用
+                        if let Ok(mut g) = JOB.lock() {
+                            if let Some((_, mut c)) = g.child.take() {
+                                let _ = c.kill();
+                                let _ = c.wait();
+                            }
                         }
+                        return Err("扫描超时：进程长时间没有输出，已自动终止。请重试。".to_string());
                     }
-                    return Err("扫描超时：进程长时间没有输出，已自动终止。请重试。".to_string());
+                    // 真实删除：不自动杀，提醒用户可显式取消
+                    if !warned_silence {
+                        warned_silence = true;
+                        let _ = app.emit(
+                            "mole://progress",
+                            serde_json::json!({
+                                "id": id, "done": 0, "total": 0,
+                                "label": "任务已静默较久，仍在运行（可能在等授权）；可点取消强制终止"
+                            }),
+                        );
+                    }
                 }
             }
             Err(_) => break false,

@@ -222,7 +222,7 @@ export function Spinner({ label }: { label?: string }) {
  * mo clean 会按分类渐进输出，jobId 匹配的进度事件到达时显示真实百分比；
  * analyze 没有任何流式输出，收不到事件就显示不定态进度条 + 真实等待秒数，
  * 不伪造百分比。 */
-export function ScanProgress({ label, done, jobId }: { label: string; done?: boolean; jobId?: number }) {
+export function ScanProgress({ label, done, jobId, onCancel }: { label: string; done?: boolean; jobId?: number; onCancel?: () => void }) {
   const [sec, setSec] = useState(0);
   const [real, setReal] = useState<{ done: number; total: number; label: string } | null>(null);
   const startedAt = useRef<number>(Date.now());
@@ -244,8 +244,13 @@ export function ScanProgress({ label, done, jobId }: { label: string; done?: boo
       un?.();
     };
   }, [jobId]);
-  const pct = done ? 100 : real ? Math.min(95, (real.done / real.total) * 100) : null;
-  const head = done ? "扫描完成" : real ? `正在扫描 ${real.done}/${real.total} 类 · ${real.label || "…"}` : label;
+  // total=0 的进度事件是"静默提醒"（真实删除被看门狗豁免后的提示），不是百分比
+  const pct = done ? 100 : real && real.total > 0 ? Math.min(95, (real.done / real.total) * 100) : null;
+  const head = done
+    ? "扫描完成"
+    : real && real.total > 0
+      ? `正在扫描 ${real.done}/${real.total} 类 · ${real.label || "…"}`
+      : real?.label || label;
   return (
     <div className="panel scan-progress" data-drag style={{ opacity: done ? 0.6 : 1, transition: "opacity .4s ease" }}>
       <div className="scan-progress-head">
@@ -259,7 +264,14 @@ export function ScanProgress({ label, done, jobId }: { label: string; done?: boo
           <div className="scan-progress-fill" style={{ width: `${pct}%`, opacity: done ? 0.4 : 1 }} />
         )}
       </div>
-      <div className="scan-progress-foot">扫描过程中可先去其他页面，结果完成后自动回来</div>
+      <div className="scan-progress-foot" style={onCancel ? { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 } : undefined}>
+        <span>扫描过程中可先去其他页面，结果完成后自动回来</span>
+        {onCancel && (
+          <button className="btn ghost sm" onClick={onCancel}>
+            取消任务
+          </button>
+        )}
+      </div>
     </div>
   );
 }

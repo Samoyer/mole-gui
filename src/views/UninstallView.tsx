@@ -37,6 +37,7 @@ export default function UninstallView() {
   const previewInFlight = useRef(false);
   const listId = useRef(0);
   const listInFlight = useRef(false);
+  const runIdRef = useRef(0);
 
   useEffect(() => {
     appsRef.current = apps;
@@ -82,6 +83,7 @@ export default function UninstallView() {
 
   const refresh = async () => {
     const id = nextJobId();
+    runIdRef.current = id;
     listId.current = id;
     listInFlight.current = true;
     try {
@@ -356,6 +358,13 @@ export default function UninstallView() {
         <div className="empty-state" style={{ padding: "48px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
           <div className="spinner" style={{ margin: "0 auto 12px" }} />
           <div>正在卸载 {selected?.name}…</div>
+          <button
+            className="btn ghost sm"
+            style={{ marginTop: 12 }}
+            onClick={() => moJobCancel(runIdRef.current).catch(() => {})}
+          >
+            取消
+          </button>
         </div>
       )}
 

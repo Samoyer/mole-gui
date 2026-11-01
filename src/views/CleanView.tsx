@@ -9,7 +9,7 @@ import {
   parseCleanPreview,
   type CleanReport,
 } from "../lib/mole";
-import { ConfirmSheet, ScanProgress, Spinner } from "../components";
+import { ConfirmSheet, ScanProgress } from "../components";
 import {
   CLEAN_CACHE_TTL,
   getCleanCached,
@@ -232,7 +232,13 @@ export default function CleanView() {
           </div>
         ))}
 
-      {phase === "running" && <Spinner label="正在清理，请稍候…" />}
+      {phase === "running" && (
+        <ScanProgress
+          label="正在清理，请稍候…"
+          jobId={scanId.current}
+          onCancel={() => moJobCancel(scanId.current).catch(() => {})}
+        />
+      )}
 
       {phase === "done" && (
         <>
