@@ -621,7 +621,7 @@ fn cache_dir() -> Result<PathBuf, String> {
 }
 
 /// 缓存文件名只留字母数字和 - _，防止路径穿越
-fn cache_file(name: &str) -> Result<PathBuf, String> {
+fn sanitize_cache_name(name: &str) -> Result<String, String> {
     let safe: String = name
         .chars()
         .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
@@ -629,7 +629,45 @@ fn cache_file(name: &str) -> Result<PathBuf, String> {
     if safe.is_empty() {
         return Err("非法的缓存名".to_string());
     }
+    Ok(safe)
+}
+
+fn cache_file(name: &str) -> Result<PathBuf, String> {
+    let safe = sanitize_cache_name(name)?;
     Ok(cache_dir()?.join(format!("{safe}.json")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strip_ansi_removes_csi_sequences() {
+        assert_eq!(strip_ansi("\u{1b}[32mOK\u{1b}[0m"), "OK");
+    }
+
+    #[test]
+    fn strip_ansi_removes_osc_sequences() {
+        assert_eq!(strip_ansi("\u{1b}]0;title\u{07}body"), "body");
+        assert_eq!(strip_ansi("\u{1b}]0;title\u{1b}\\tail"), "tail");
+    }
+
+    #[test]
+    fn strip_ansi_keeps_plain_text_and_emoji() {
+        assert_eq!(strip_ansi("普通文本 123 ➤"), "普通文本 123 ➤");
+    }
+
+    #[test]
+    fn sanitize_cache_name_filters_path_separators() {
+        assert_eq!(sanitize_cache_name("../../etc/passwd").unwrap(), "etcpasswd");
+        assert_eq!(sanitize_cache_name("analyze-/Users/x").unwrap(), "analyze-Usersx");
+    }
+
+    #[test]
+    fn sanitize_cache_name_rejects_fully_filtered_names() {
+        assert!(sanitize_cache_name("").is_err());
+        assert!(sanitize_cache_name("///").is_err());
+    }
 }
 
 #[tauri::command]
