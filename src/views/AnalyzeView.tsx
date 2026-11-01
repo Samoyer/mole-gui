@@ -173,7 +173,7 @@ export default function AnalyzeView() {
       </div>
 
       {error && <div className="error-box">{error}</div>}
-      {phase === "scanning" && <ScanProgress label="正在扫描磁盘占用…" done={scanDone} />}
+      {phase === "scanning" && <ScanProgress label="正在扫描磁盘占用…" done={scanDone} jobId={jobId.current} />}
 
       {phase === "init" && !data && (
         <section className="panel" data-drag>

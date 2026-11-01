@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { onMoProgress } from "./lib/mole";
 
 /* ---------- Icons (24x24 stroke, SF-Symbol-like weights) ---------- */
 
@@ -218,37 +219,45 @@ export function Spinner({ label }: { label?: string }) {
 }
 
 /* ---------- 扫描进度条 ----------
- * mo analyze / mo clean 都是扫描结束一次性吐出结果，不流式吐进度，
- * 拿不到真实百分比。这里用已等待时间驱动一个平滑逼近的进度条：
- * 指数逼近到 ~86%（20 秒左右），扫描完成时跳 100%，比空转转圈更有真实感。 */
-export function ScanProgress({ label, done }: { label: string; done?: boolean }) {
-  const [pct, setPct] = useState(4);
+ * mo clean 会按分类渐进输出，jobId 匹配的进度事件到达时显示真实百分比；
+ * analyze 没有任何流式输出，收不到事件就显示不定态进度条 + 真实等待秒数，
+ * 不伪造百分比。 */
+export function ScanProgress({ label, done, jobId }: { label: string; done?: boolean; jobId?: number }) {
   const [sec, setSec] = useState(0);
+  const [real, setReal] = useState<{ done: number; total: number; label: string } | null>(null);
   const startedAt = useRef<number>(Date.now());
   useEffect(() => {
-    const TARGET = 86;
     const t = window.setInterval(() => {
-      // 指数逼近：每 tick 走剩余距离的 9%，永远到不了 100%，
-      // 扫描结束后外层把 done 置真，这里直接跳到 100%
-      setPct((p) => Math.min(TARGET, p + (TARGET - p) * 0.09));
-      // 用真实经过时间算秒数，避免 300ms tick 被当成 1 秒的误差
       setSec(Math.round((Date.now() - startedAt.current) / 1000));
     }, 300);
     return () => window.clearInterval(t);
   }, []);
-  // 扫描完成后：进度条填满到 100%，随后淡出，由外层切到结果页
   useEffect(() => {
-    if (done) setPct(100);
-  }, [done]);
-  const elapsed = sec;
+    if (!jobId) return;
+    let un: (() => void) | null = null;
+    onMoProgress((p) => {
+      if (p.id === jobId) setReal({ done: p.done, total: p.total, label: p.label });
+    }).then((f) => {
+      un = f;
+    });
+    return () => {
+      un?.();
+    };
+  }, [jobId]);
+  const pct = done ? 100 : real ? Math.min(95, (real.done / real.total) * 100) : null;
+  const head = done ? "扫描完成" : real ? `正在扫描 ${real.done}/${real.total} 类 · ${real.label || "…"}` : label;
   return (
     <div className="panel scan-progress" data-drag style={{ opacity: done ? 0.6 : 1, transition: "opacity .4s ease" }}>
       <div className="scan-progress-head">
-        <span>{done ? "扫描完成" : label}</span>
-        <span className="scan-elapsed">已等待 {elapsed}s</span>
+        <span>{head}</span>
+        <span className="scan-elapsed">{pct !== null ? `${Math.round(pct)}%` : `已等待 ${sec}s`}</span>
       </div>
       <div className="scan-progress-bar">
-        <div className="scan-progress-fill" style={{ width: `${pct}%`, opacity: done ? 0.4 : 1 }} />
+        {pct === null ? (
+          <div className="scan-progress-fill indeterminate" />
+        ) : (
+          <div className="scan-progress-fill" style={{ width: `${pct}%`, opacity: done ? 0.4 : 1 }} />
+        )}
       </div>
       <div className="scan-progress-foot">扫描过程中可先去其他页面，结果完成后自动回来</div>
     </div>

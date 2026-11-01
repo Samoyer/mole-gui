@@ -140,7 +140,7 @@ export default function CleanView() {
     }
   };
 
-  if (phase === "scanning") return <ScanProgress label="正在扫描可清理的项目…" done={scanDone} />;
+  if (phase === "scanning") return <ScanProgress label="正在扫描可清理的项目…" done={scanDone} jobId={scanId.current} />;
   if (error && !report) return <div className="error-box">{error}</div>;
   if (phase === "init" && !report) {
     return (

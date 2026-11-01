@@ -156,10 +156,35 @@ fn spawn_nice(
     cmd.spawn().map_err(|e| format!("无法启动 mo：{e}"))
 }
 
+/// mo clean 按分类渐进输出（"➤ 分类名"），实测共 14 个分类头。
+/// 每出现一个标记就给前端发一次真实进度事件。
+const CLEAN_CATEGORY_TOTAL: usize = 14;
+
+fn emit_clean_progress(app: &AppHandle, id: u64, raw_line: &[u8], cat_done: &mut usize) {
+    let line = strip_ansi(&String::from_utf8_lossy(raw_line));
+    let trimmed = line.trim();
+    let finished = trimmed.contains("Potential space") || trimmed.contains("Clean complete");
+    let marker = trimmed.strip_prefix('➤').map(|s| s.trim().to_string());
+    if marker.is_none() && !finished {
+        return;
+    }
+    let (done, label) = if finished {
+        (CLEAN_CATEGORY_TOTAL, "汇总统计".to_string())
+    } else {
+        *cat_done += 1;
+        (*cat_done, marker.unwrap_or_default())
+    };
+    let _ = app.emit(
+        "mole://progress",
+        serde_json::json!({ "id": id, "done": done, "total": CLEAN_CATEGORY_TOTAL, "label": label }),
+    );
+}
+
 /// 执行重型 mo 任务：全局串行（排队等前一个完成）、可取消。
 /// cancellable=false 用于真实删除（clean/uninstall），取消信号会被忽略，
 /// 防止删除进行到一半被中断。
 fn run_mo_heavy(
+    app: AppHandle,
     id: u64,
     args: &[&str],
     stdin_text: Option<&str>,
@@ -259,6 +284,8 @@ fn run_mo_heavy(
     // 120s 静默阈值会误杀合法慢扫描；300s 仍能兜底历史上的 40 分钟悬挂
     let silence_limit = std::time::Duration::from_secs(300);
     let mut last_output_at = std::time::Instant::now();
+    let mut line_buf: Vec<u8> = Vec::new();
+    let mut cat_done: usize = 0;
     let cancelled = loop {
         {
             let g = JOB.lock().map_err(|e| e.to_string())?;
@@ -272,6 +299,11 @@ fn run_mo_heavy(
                     break false;
                 }
                 out.extend_from_slice(&chunk);
+                line_buf.extend_from_slice(&chunk);
+                while let Some(pos) = line_buf.iter().position(|&b| b == b'\n') {
+                    let line: Vec<u8> = line_buf.drain(..=pos).collect();
+                    emit_clean_progress(&app, id, &line, &mut cat_done);
+                }
                 last_output_at = std::time::Instant::now();
             }
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
@@ -474,29 +506,29 @@ fn mo_status_watch_stop() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn mo_clean_preview(id: u64) -> Result<String, String> {
-    run_mo_heavy(id, &["clean", "--dry-run"], None, true)
+fn mo_clean_preview(app: AppHandle, id: u64) -> Result<String, String> {
+    run_mo_heavy(app, id, &["clean", "--dry-run"], None, true)
 }
 
 #[tauri::command]
-fn mo_clean_run(id: u64) -> Result<String, String> {
+fn mo_clean_run(app: AppHandle, id: u64) -> Result<String, String> {
     // mo 在管道输入（非 TTY）时自动进入非交互模式，不需要显式确认。
     // 前端在用户点击"立即清理"前已通过 ConfirmSheet 二次确认。
-    run_mo_heavy(id, &["clean"], None, false)
+    run_mo_heavy(app, id, &["clean"], None, false)
 }
 
 #[tauri::command]
-fn mo_uninstall_list(id: u64) -> Result<String, String> {
-    run_mo_heavy(id, &["uninstall", "--list"], None, true)
+fn mo_uninstall_list(app: AppHandle, id: u64) -> Result<String, String> {
+    run_mo_heavy(app, id, &["uninstall", "--list"], None, true)
 }
 
 #[tauri::command]
-fn mo_uninstall_preview(name: String, id: u64) -> Result<String, String> {
-    run_mo_heavy(id, &["uninstall", "--dry-run", &name], None, true)
+fn mo_uninstall_preview(app: AppHandle, name: String, id: u64) -> Result<String, String> {
+    run_mo_heavy(app, id, &["uninstall", "--dry-run", &name], None, true)
 }
 
 #[tauri::command]
-fn mo_uninstall_run(name: String, permanent: bool, id: u64) -> Result<String, String> {
+fn mo_uninstall_run(app: AppHandle, name: String, permanent: bool, id: u64) -> Result<String, String> {
     let args: Vec<&str> = if permanent {
         vec!["uninstall", "--permanent", &name]
     } else {
@@ -504,17 +536,17 @@ fn mo_uninstall_run(name: String, permanent: bool, id: u64) -> Result<String, St
     };
     // mo uninstall 不像 mo clean 那样能自动非交互：它明确要求交互式确认。
     // 必须在 stdin 喂 "y" 才能通过，否则会拒绝执行。
-    run_mo_heavy(id, &args, Some("y\n"), false)
+    run_mo_heavy(app, id, &args, Some("y\n"), false)
 }
 
 #[tauri::command]
-fn mo_analyze(path: Option<String>, id: u64) -> Result<String, String> {
+fn mo_analyze(app: AppHandle, path: Option<String>, id: u64) -> Result<String, String> {
     match path {
         Some(p) if !p.trim().is_empty() => {
             let p = p.trim().to_string();
-            run_mo_heavy(id, &["analyze", "--json", &p], None, true)
+            run_mo_heavy(app, id, &["analyze", "--json", &p], None, true)
         }
-        _ => run_mo_heavy(id, &["analyze", "--json"], None, true),
+        _ => run_mo_heavy(app, id, &["analyze", "--json"], None, true),
     }
 }
 

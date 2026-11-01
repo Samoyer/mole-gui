@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 /* ---------- Backend commands ---------- */
 
@@ -31,6 +32,20 @@ export function nextJobId(): number {
 
 export function isCancelError(e: unknown): boolean {
   return String(e).includes("已取消");
+}
+
+/* ---------- 扫描进度事件 ----------
+ * mo clean 按分类渐进输出（"➤ 分类名"），Rust 侧逐行解析后发事件；
+ * analyze 没有任何流式输出，收不到事件就保持诚实的等待计时显示。 */
+export interface MoProgress {
+  id: number;
+  done: number;
+  total: number;
+  label: string;
+}
+
+export function onMoProgress(handler: (p: MoProgress) => void) {
+  return listen<MoProgress>("mole://progress", (e) => handler(e.payload));
 }
 
 /* ---------- Shared types ---------- */
