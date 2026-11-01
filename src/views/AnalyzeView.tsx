@@ -49,6 +49,7 @@ export default function AnalyzeView() {
   const [data, setData] = useState<AnalyzeData | null>(null);
   const [staleAt, setStaleAt] = useState<number | null>(null);
   const [crumbs, setCrumbs] = useState<Crumb[]>([{ label: "概览", path: null }]);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [phase, setPhase] = useState<InitPhase>("init");
   const [error, setError] = useState<string | null>(null);
   const [scanDone, setScanDone] = useState(false);
@@ -81,6 +82,8 @@ export default function AnalyzeView() {
       }
     }
     const id = nextJobId();
+    // 新任务开始前取消在途任务，避免连点时多个 mo 进程互相抢资源
+    if (jobInFlight.current) moJobCancel(jobId.current).catch(() => {});
     jobId.current = id;
     jobInFlight.current = true;
     scanStartedAt.current = Date.now();
@@ -89,6 +92,7 @@ export default function AnalyzeView() {
     else setPhase("refreshing");
     setError(null);
     const isOverview = path === null;
+    setPendingPath(path);
     if (isOverview) {
       overviewSession.inFlight = true;
       overviewSession.jobId = id;
@@ -108,12 +112,23 @@ export default function AnalyzeView() {
       window.setTimeout(() => {
         if (mounted.current) setPhase("ready");
       }, 600);
+      if (mounted.current) setPendingPath(null);
     } catch (e) {
       // 卸载后完成的概览扫描把错误留给重挂载的组件展示
       if (isOverview && !mounted.current && !isCancelError(e)) overviewSession.error = String(e);
       if (!isCancelError(e)) {
         setError(String(e));
         if (!hasContent.current) setPhase("init");
+      }
+      // 下钻失败/被取消：把没加载成功的面包屑回滚掉，避免出现
+      // "点了没反应→连点→面包屑串包"的垃圾链。
+      // 只处理最新任务，防止旧任务的取消回调误伤新任务的面包屑
+      if (mounted.current && path !== null && jobId.current === id) {
+        setPendingPath(null);
+        setCrumbs((c) => {
+          const idx = c.findIndex((cr) => cr.path === path);
+          return idx > 0 ? c.slice(0, idx) : c;
+        });
       }
     } finally {
       jobInFlight.current = false;
@@ -181,11 +196,13 @@ export default function AnalyzeView() {
   }, []);
 
   const drill = (path: string, label: string) => {
+    if (jobInFlight.current) return;
     setCrumbs((c) => [...c, { label, path }]);
     load(path);
   };
 
   const jump = (idx: number) => {
+    if (jobInFlight.current) return;
     const target = crumbs[idx];
     setCrumbs(crumbs.slice(0, idx + 1));
     load(target.path);
@@ -217,7 +234,11 @@ export default function AnalyzeView() {
       {phase === "refreshing" && (
         <div style={{ marginBottom: 14 }}>
           <ScanProgress
-            label="正在重新扫描磁盘占用…"
+            label={
+              pendingPath
+                ? `正在扫描 ${pendingPath.split("/").filter(Boolean).pop() ?? pendingPath}…`
+                : "正在重新扫描磁盘占用…"
+            }
             jobId={jobId.current}
             startedAt={scanStartedAt.current || undefined}
             onCancel={() => moJobCancel(jobId.current).catch(() => {})}
@@ -274,7 +295,9 @@ export default function AnalyzeView() {
             <>
               <div className="section-title" style={{ margin: "18px 0 12px" }}>
                 空间分布
-                <span className="hint">方块大小代表占用 · 点击文件夹下钻</span>
+                <span className="hint">
+                  {pendingPath ? "正在加载下钻内容…" : "方块大小代表占用 · 点击文件夹下钻"}
+                </span>
               </div>
               <Treemap
                 items={entries.map((e) => ({
