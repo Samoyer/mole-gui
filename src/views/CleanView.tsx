@@ -97,11 +97,14 @@ async function startScan(force = false) {
     const parsed = parseCleanPreview(text);
     setCleanCached(parsed);
     persistClean(parsed);
-    // 扫描成功：进度条推到 100%，短暂展示后切到结果页
-    setClean({ report: parsed, hasContent: true, scanDone: true, scanInFlight: false, refreshing: false });
+    // 扫描成功：进度条推到 100%，短暂展示后收起（冷启动路径再切结果页）
+    setClean({ report: parsed, hasContent: true, scanDone: true, scanInFlight: false });
     window.setTimeout(() => {
       const cur = cleanStore.state;
-      if (cur.scanId === id && cur.phase === "scanning" && cur.scanDone) setClean({ phase: "preview" });
+      if (cur.scanId === id && cur.scanDone) {
+        if (cur.phase === "scanning") setClean({ phase: "preview" });
+        setClean({ refreshing: false, scanDone: false });
+      }
     }, 600);
   } catch (e) {
     if (!isCancelError(e)) {
@@ -190,6 +193,12 @@ export default function CleanView() {
       {report.sudoNote && (
         <div className="notice-box">
           部分系统缓存需要管理员权限才能预览，本次仅显示用户空间可清理的内容。
+        </div>
+      )}
+
+      {snap.refreshing && (
+        <div style={{ marginBottom: 14 }}>
+          <ScanProgress label="正在重新扫描…" jobId={snap.scanId} startedAt={snap.scanStartedAt || undefined} />
         </div>
       )}
 
