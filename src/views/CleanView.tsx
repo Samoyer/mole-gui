@@ -63,6 +63,7 @@ export default function CleanView() {
       setPhase("scanning");
     }
     setError(null);
+    let errored = false;
     try {
       const text = await moCleanPreview(id);
       if (!mounted.current) return;
@@ -78,6 +79,7 @@ export default function CleanView() {
       }, 600);
     } catch (e) {
       if (mounted.current && !isCancelError(e)) {
+        errored = true;
         setError(String(e));
         if (!report) {
           setOutput(String(e));
@@ -88,7 +90,8 @@ export default function CleanView() {
       scanInFlight.current = false;
       if (mounted.current) {
         setRefreshing(false);
-        if (!hasContent.current && !report) setPhase("init");
+        // 出错时保留错误页面，不能把 phase 重置回 init 把错误吞掉
+        if (!errored && !hasContent.current && !report) setPhase("init");
       }
     }
   }, []);
@@ -138,6 +141,7 @@ export default function CleanView() {
   };
 
   if (phase === "scanning") return <ScanProgress label="正在扫描可清理的项目…" done={scanDone} />;
+  if (error && !report) return <div className="error-box">{error}</div>;
   if (phase === "init" && !report) {
     return (
       <section className="panel clean-hero" data-drag>
@@ -149,7 +153,6 @@ export default function CleanView() {
       </section>
     );
   }
-  if (error && !report) return <div className="error-box">{error}</div>;
   if (!report) return null;
 
   const showHero = phase === "preview" || phase === "confirm";

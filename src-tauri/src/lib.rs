@@ -255,7 +255,9 @@ fn run_mo_heavy(
     let mut out: Vec<u8> = Vec::new();
     // 看门狗：stdout 静默超过 120 秒就判定扫描挂起/通道断裂，
     // 不再让前端无限等待（历史上出现过子进程被信号杀死但 invoke 悬挂 40 分钟的情况）
-    let silence_limit = std::time::Duration::from_secs(120);
+    // clean --dry-run 冷启动实测约 150s 且 stdout 全缓冲（结束前零输出），
+    // 120s 静默阈值会误杀合法慢扫描；300s 仍能兜底历史上的 40 分钟悬挂
+    let silence_limit = std::time::Duration::from_secs(300);
     let mut last_output_at = std::time::Instant::now();
     let cancelled = loop {
         {
