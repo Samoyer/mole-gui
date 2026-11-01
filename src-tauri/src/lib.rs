@@ -385,11 +385,11 @@ fn mo_status() -> Result<String, String> {
 
 #[tauri::command]
 fn mo_status_watch_start(app: AppHandle) -> Result<(), String> {
-    {
-        let guard = WATCH_CHILD.lock().map_err(|e| e.to_string())?;
-        if guard.is_some() {
-            return Ok(());
-        }
+    // 检查、spawn、登记必须在同一临界区内完成：否则两次并发调用会
+    // 双双通过检查并各起一个 status-go，先到的 Child 被顶掉后无人能回收
+    let mut guard = WATCH_CHILD.lock().map_err(|e| e.to_string())?;
+    if guard.is_some() {
+        return Ok(());
     }
     let mo = find_mo()?;
     let mut child = Command::new("/usr/bin/nice")
@@ -401,10 +401,8 @@ fn mo_status_watch_start(app: AppHandle) -> Result<(), String> {
         .spawn()
         .map_err(|e| format!("无法启动 mo status --watch：{e}"))?;
     let stdout = child.stdout.take().ok_or("无法读取 mo watch 输出")?;
-    WATCH_CHILD
-        .lock()
-        .map_err(|e| e.to_string())?
-        .replace(child);
+    guard.replace(child);
+    drop(guard);
     std::thread::spawn(move || {
         let reader = BufReader::new(stdout);
         for line in reader.lines() {
