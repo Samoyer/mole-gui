@@ -11,8 +11,27 @@ import {
 import { getStatusCache, setStatusCache, readStatusPersist, persistStatus } from "../lib/cache";
 import { Ring, Spinner, pctClass } from "../components";
 
+// mo 在权限受限（TCC 被拒等）时会输出 null 字段而不是空数组，
+// 任何一处直接 .map/.toFixed 都会崩掉整棵 React 树把窗口变白屏，
+// 所以所有数据入口必须先过这一层兜底
+function normalizeStatus(s: StatusData): StatusData {
+  return {
+    ...s,
+    cpu: s.cpu ?? { usage: 0, load1: 0, load5: 0, load15: 0, core_count: 0 },
+    memory: s.memory ?? { used: 0, total: 0, available: 0, used_percent: 0, swap_used: 0 },
+    disks: s.disks ?? [],
+    disk_io: s.disk_io ?? { read_rate: 0, write_rate: 0 },
+    network: s.network ?? [],
+    thermal: s.thermal ?? { system_power: 0, fan_speed: 0 },
+    top_processes: s.top_processes ?? [],
+  };
+}
+
 export default function StatusView() {
-  const [data, setData] = useState<StatusData | null>(() => getStatusCache());
+  const [data, setData] = useState<StatusData | null>(() => {
+    const cached = getStatusCache();
+    return cached ? normalizeStatus(cached) : null;
+  });
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState(() => !!getStatusCache());
 
@@ -22,8 +41,9 @@ export default function StatusView() {
     if (!getStatusCache()) {
       readStatusPersist().then((disk) => {
         if (!alive || !disk || getStatusCache()) return;
-        setStatusCache(disk.data);
-        setData(disk.data);
+          const norm = normalizeStatus(disk.data);
+          setStatusCache(norm);
+          setData(norm);
       });
     }
     let pollTimer: number | null = null;
@@ -48,11 +68,12 @@ export default function StatusView() {
           next.top_processes = lastRef.top_processes;
         }
       }
-      lastRef = next;
       lastFrameAt = Date.now();
-      setStatusCache(next);
-      persistStatus(next);
-      setData(next);
+      const norm = normalizeStatus(next);
+      lastRef = norm;
+      setStatusCache(norm);
+      persistStatus(norm);
+      setData(norm);
       setLive(true);
     };
 

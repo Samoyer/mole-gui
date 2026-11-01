@@ -512,14 +512,21 @@ fn mo_job_cancel(id: u64) -> Result<(), String> {
     Ok(())
 }
 
+// 注意：所有会跑满整个 mo 子进程生命周期的命令必须是 async + spawn_blocking。
+// Tauri 的同步命令在主线程上执行，阻塞会冻结 WebView 重绘——
+// 症状就是扫描期间界面整个卡死、动效画不出来、点页面不切换。
 #[tauri::command]
-fn mo_version() -> Result<String, String> {
-    run_mo_clean(&["--version"], None)
+async fn mo_version() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(|| run_mo_clean(&["--version"], None))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn mo_status() -> Result<String, String> {
-    run_mo_clean(&["status", "--json"], None)
+async fn mo_status() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(|| run_mo_clean(&["status", "--json"], None))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -643,48 +650,68 @@ fn mo_status_watch_stop() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn mo_clean_preview(app: AppHandle, id: u64) -> Result<String, String> {
-    run_mo_heavy(app, id, &["clean", "--dry-run"], None, None, true)
+async fn mo_clean_preview(app: AppHandle, id: u64) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_mo_heavy(app, id, &["clean", "--dry-run"], None, None, true)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn mo_clean_run(app: AppHandle, id: u64) -> Result<String, String> {
+async fn mo_clean_run(app: AppHandle, id: u64) -> Result<String, String> {
     // mo 在管道输入（非 TTY）时自动进入非交互模式，不需要显式确认。
     // 前端在用户点击"立即清理"前已通过 ConfirmSheet 二次确认。
-    run_mo_heavy(app, id, &["clean"], None, None, false)
+    tauri::async_runtime::spawn_blocking(move || run_mo_heavy(app, id, &["clean"], None, None, false))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn mo_uninstall_list(app: AppHandle, id: u64) -> Result<String, String> {
-    run_mo_heavy(app, id, &["uninstall", "--list"], None, None, true)
+async fn mo_uninstall_list(app: AppHandle, id: u64) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_mo_heavy(app, id, &["uninstall", "--list"], None, None, true)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn mo_uninstall_preview(app: AppHandle, name: String, id: u64) -> Result<String, String> {
-    run_mo_heavy(app, id, &["uninstall", "--dry-run", &name], None, None, true)
+async fn mo_uninstall_preview(app: AppHandle, name: String, id: u64) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        run_mo_heavy(app, id, &["uninstall", "--dry-run", &name], None, None, true)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn mo_uninstall_run(app: AppHandle, name: String, permanent: bool, id: u64) -> Result<String, String> {
-    let args: Vec<&str> = if permanent {
-        vec!["uninstall", "--permanent", &name]
-    } else {
-        vec!["uninstall", &name]
-    };
-    // mo uninstall 明确要求交互式确认（检查 stdin 是否为终端），
-    // 必须经真 PTY 运行，并在出现确认提示后喂 "y"。
-    run_mo_heavy(app, id, &args, None, Some(("confirm,", "y")), false)
+async fn mo_uninstall_run(app: AppHandle, name: String, permanent: bool, id: u64) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let args: Vec<&str> = if permanent {
+            vec!["uninstall", "--permanent", &name]
+        } else {
+            vec!["uninstall", &name]
+        };
+        // mo uninstall 明确要求交互式确认（检查 stdin 是否为终端），
+        // 必须经真 PTY 运行，并在出现确认提示后喂 "y"。
+        run_mo_heavy(app, id, &args, None, Some(("confirm,", "y")), false)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-fn mo_analyze(app: AppHandle, path: Option<String>, id: u64) -> Result<String, String> {
-    match path {
+async fn mo_analyze(app: AppHandle, path: Option<String>, id: u64) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || match path {
         Some(p) if !p.trim().is_empty() => {
             let p = p.trim().to_string();
             run_mo_heavy(app, id, &["analyze", "--json", &p], None, None, true)
         }
         _ => run_mo_heavy(app, id, &["analyze", "--json"], None, None, true),
-    }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// 扫描结果的磁盘缓存目录（跟随 gdu/GrandPerspective 的「结果持久化」思路：
