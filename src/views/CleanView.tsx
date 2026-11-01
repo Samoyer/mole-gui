@@ -141,7 +141,15 @@ export default function CleanView() {
   };
 
   if (phase === "scanning") return <ScanProgress label="正在扫描可清理的项目…" done={scanDone} jobId={scanId.current} />;
-  if (error && !report) return <div className="error-box">{error}</div>;
+  if (error && !report)
+    return (
+      <div className="error-box">
+        {error}
+        <button className="btn ghost sm" style={{ marginLeft: 12 }} onClick={() => scan(true)}>
+          重试
+        </button>
+      </div>
+    );
   if (phase === "init" && !report) {
     return (
       <section className="panel clean-hero" data-drag>
