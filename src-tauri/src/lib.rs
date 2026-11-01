@@ -67,37 +67,71 @@ fn run_mo(args: &[&str], stdin_text: Option<&str>) -> Result<String, String> {
     // nice 大幅降低 mo 子进程的 CPU 优先级，避免采集时抢占 UI 渲染
     let mut cmd = Command::new("/usr/bin/nice");
     cmd.args(["-n", "10"]).arg(&mo).args(args);
+    cmd.stdin(if stdin_text.is_some() {
+        std::process::Stdio::piped()
+    } else {
+        std::process::Stdio::null()
+    });
+    let mut child = cmd
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("无法启动 mo：{e}"))?;
     if let Some(text) = stdin_text {
-        cmd.stdin(std::process::Stdio::piped());
-        let mut child = cmd
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("无法启动 mo：{e}"))?;
         if let Some(mut stdin) = child.stdin.take() {
             use std::io::Write;
             let _ = stdin.write_all(text.as_bytes());
         }
-        let out = child.wait_with_output().map_err(|e| format!("mo 执行失败：{e}"))?;
-        let mut text = String::from_utf8_lossy(&out.stdout).to_string();
-        let err = String::from_utf8_lossy(&out.stderr).to_string();
-        if !err.trim().is_empty() {
-            text.push_str("\n");
-            text.push_str(&err);
-        }
-        Ok(text)
-    } else {
-        let out = cmd
-            .output()
-            .map_err(|e| format!("无法运行 mo：{e}"))?;
-        let mut text = String::from_utf8_lossy(&out.stdout).to_string();
-        let err = String::from_utf8_lossy(&out.stderr).to_string();
-        if !err.trim().is_empty() {
-            text.push_str("\n");
-            text.push_str(&err);
-        }
-        Ok(text)
     }
+    let mut stdout = child.stdout.take().ok_or("无法读取 mo 输出")?;
+    let mut stderr = child.stderr.take();
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stdout.read_to_end(&mut buf);
+        let _ = tx.send(buf);
+    });
+    let (etx, erx) = std::sync::mpsc::channel::<Vec<u8>>();
+    std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(se) = stderr.as_mut() {
+            let _ = se.read_to_end(&mut buf);
+        }
+        let _ = etx.send(buf);
+    });
+    // 轻量命令也必须有截止时间：mo 卡死时不能让 invoke 永久悬挂
+    let timeout = std::time::Duration::from_secs(30);
+    let deadline = std::time::Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(s)) => break s,
+            Ok(None) => {
+                if std::time::Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!("mo 命令超时（{} 秒无响应）", timeout.as_secs()));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Err(e) => return Err(format!("mo 执行失败：{e}")),
+        }
+    };
+    let out = rx.recv().unwrap_or_default();
+    let err_out = erx.recv().unwrap_or_default();
+    let mut text = String::from_utf8_lossy(&out).to_string();
+    let err = String::from_utf8_lossy(&err_out).to_string();
+    if !err.trim().is_empty() {
+        text.push_str("\n");
+        text.push_str(&err);
+    }
+    if text.trim().is_empty() {
+        if let Some(code) = status.code() {
+            if code != 0 {
+                text = format!("mo 退出码 {code}");
+            }
+        }
+    }
+    Ok(text)
 }
 
 /// mo 在交互输出里使用 ANSI 颜色/控制序列，GUI 里直接显示会出乱码，
