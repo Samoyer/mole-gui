@@ -190,11 +190,18 @@ fn spawn_nice(
     cmd.spawn().map_err(|e| format!("无法启动 mo：{e}"))
 }
 
-/// mo clean 按分类渐进输出（"➤ 分类名"），实测共 14 个分类头。
-/// 每出现一个标记就给前端发一次真实进度事件。
+/// mo clean 按分类渐进输出（"➤ 分类名"），实测 14 个分类头。
+/// 每出现一个标记就给前端发一次真实进度事件；总数以实际看到的
+/// 分类头动态校准（mole 升级增减分类时百分比才不会算错）。
 const CLEAN_CATEGORY_TOTAL: usize = 14;
 
-fn emit_clean_progress(app: &AppHandle, id: u64, raw_line: &[u8], cat_done: &mut usize) {
+fn emit_clean_progress(
+    app: &AppHandle,
+    id: u64,
+    raw_line: &[u8],
+    cat_done: &mut usize,
+    cat_total: &mut usize,
+) {
     let line = strip_ansi(&String::from_utf8_lossy(raw_line));
     let trimmed = line.trim();
     let finished = trimmed.contains("Potential space") || trimmed.contains("Clean complete");
@@ -203,14 +210,17 @@ fn emit_clean_progress(app: &AppHandle, id: u64, raw_line: &[u8], cat_done: &mut
         return;
     }
     let (done, label) = if finished {
-        (CLEAN_CATEGORY_TOTAL, "汇总统计".to_string())
+        (*cat_total, "汇总统计".to_string())
     } else {
         *cat_done += 1;
+        if *cat_done > *cat_total {
+            *cat_total = *cat_done;
+        }
         (*cat_done, marker.unwrap_or_default())
     };
     let _ = app.emit(
         "mole://progress",
-        serde_json::json!({ "id": id, "done": done, "total": CLEAN_CATEGORY_TOTAL, "label": label }),
+        serde_json::json!({ "id": id, "done": done, "total": *cat_total, "label": label }),
     );
 }
 
@@ -324,6 +334,7 @@ fn run_mo_heavy(
     let mut warned_silence = false;
     let mut line_buf: Vec<u8> = Vec::new();
     let mut cat_done: usize = 0;
+    let mut cat_total: usize = CLEAN_CATEGORY_TOTAL;
     let cancelled = loop {
         {
             let g = JOB.lock().map_err(|e| e.to_string())?;
@@ -340,7 +351,7 @@ fn run_mo_heavy(
                 line_buf.extend_from_slice(&chunk);
                 while let Some(pos) = line_buf.iter().position(|&b| b == b'\n') {
                     let line: Vec<u8> = line_buf.drain(..=pos).collect();
-                    emit_clean_progress(&app, id, &line, &mut cat_done);
+                    emit_clean_progress(&app, id, &line, &mut cat_done, &mut cat_total);
                 }
                 last_output_at = std::time::Instant::now();
                 warned_silence = false;
