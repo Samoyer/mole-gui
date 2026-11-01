@@ -249,7 +249,7 @@ fn run_mo_heavy(
     id: u64,
     args: &[&str],
     stdin_text: Option<&str>,
-    prompt_response: Option<&str>,
+    prompt_response: Option<(&str, &str)>,
     cancellable: bool,
 ) -> Result<String, String> {
     let mo = find_mo()?;
@@ -312,9 +312,11 @@ fn run_mo_heavy(
     let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
     // stderr 也单独读，避免管道满导致子进程阻塞
     let (etx, erx) = std::sync::mpsc::channel::<Vec<u8>>();
-    // PTY 模式：stdout 出现确认提示后再喂应答键，避免预喂的按键
-    // 被 mo 的 drain_pending_input 当作"待清理输入"冲掉
-    let responder = prompt_response.map(|s| s.to_string());
+    // PTY 模式：stdout 出现确认提示（marker）后再喂应答键（reply），
+    // 避免预喂的按键被 mo 的 drain_pending_input 当作"待清理输入"冲掉；
+    // marker 和 reply 必须分开——拿 reply 当标记会匹配到输出里的
+    // 任意同名字节而提前误触发
+    let responder = prompt_response.map(|(m, r)| (m.to_string(), r.to_string()));
     let responder_stdin = pty_stdin;
     if let Some(mut se) = stderr_handle.take() {
         std::thread::spawn(move || {
@@ -349,14 +351,14 @@ fn run_mo_heavy(
                     break;
                 }
                 Ok(n) => {
-                    if let (Some(resp), Some(stdin)) = (&pending, &responder_stdin) {
+                if let (Some((marker, reply)), Some(stdin)) = (&pending, &responder_stdin) {
                         carry.extend_from_slice(&buf[..n]);
-                        if carry.windows(resp.len()).any(|w| w == resp.as_bytes()) {
-                            if let Ok(mut g) = stdin.lock() {
-                                if let Some(h) = g.as_mut() {
-                                    use std::io::Write;
-                                    let _ = h.write_all(resp.as_bytes());
-                                    let _ = h.flush();
+                    if carry.windows(marker.len()).any(|w| w == marker.as_bytes()) {
+                        if let Ok(mut g) = stdin.lock() {
+                            if let Some(h) = g.as_mut() {
+                                use std::io::Write;
+                                let _ = h.write_all(reply.as_bytes());
+                                let _ = h.flush();
                                 }
                             }
                             pending = None;
@@ -664,7 +666,7 @@ fn mo_uninstall_run(app: AppHandle, name: String, permanent: bool, id: u64) -> R
     };
     // mo uninstall 明确要求交互式确认（检查 stdin 是否为终端），
     // 必须经真 PTY 运行，并在出现确认提示后喂 "y"。
-    run_mo_heavy(app, id, &args, None, Some("y"), false)
+    run_mo_heavy(app, id, &args, None, Some(("confirm,", "y")), false)
 }
 
 #[tauri::command]
