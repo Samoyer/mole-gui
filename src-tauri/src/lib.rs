@@ -351,21 +351,28 @@ fn run_mo_heavy(
                     break;
                 }
                 Ok(n) => {
-                if let (Some((marker, reply)), Some(stdin)) = (&pending, &responder_stdin) {
-                        carry.extend_from_slice(&buf[..n]);
-                    if carry.windows(marker.len()).any(|w| w == marker.as_bytes()) {
-                        if let Ok(mut g) = stdin.lock() {
-                            if let Some(h) = g.as_mut() {
-                                use std::io::Write;
-                                let _ = h.write_all(reply.as_bytes());
-                                let _ = h.flush();
+                    carry.extend_from_slice(&buf[..n]);
+                    if carry.len() > 256 {
+                        // 只留尾部，防止长输出无限累积
+                        carry.drain(..carry.len() - 256);
+                    }
+                    if let Some((marker, reply)) = pending.as_ref() {
+                        if carry.windows(marker.len()).any(|w| w == marker.as_bytes()) {
+                            // mo 打印提示后会先 drain 输入缓冲，立刻喂键会被
+                            // 当作"待清理输入"冲掉；延迟到 drain 结束、read
+                            // 已在阻塞等待时再喂
+                            let reply = reply.clone();
+                            let stdin = responder_stdin.clone();
+                            std::thread::spawn(move || {
+                                std::thread::sleep(std::time::Duration::from_millis(2000));
+                                let h = stdin.as_ref().and_then(|arc| arc.lock().ok()).and_then(|mut g| g.take());
+                                if let Some(mut h) = h {
+                                    use std::io::Write;
+                                    let _ = h.write_all(reply.as_bytes());
+                                    let _ = h.flush();
                                 }
-                            }
+                            });
                             pending = None;
-                            carry.clear();
-                        } else if carry.len() > 256 {
-                            // 只留尾部，防止长输出无限累积
-                            carry.drain(..carry.len() - 256);
                         }
                     }
                     if tx.send(buf[..n].to_vec()).is_err() {
