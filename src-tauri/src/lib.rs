@@ -244,6 +244,7 @@ fn run_mo_heavy(
         {
             let mut g = JOB.lock().map_err(|e| e.to_string())?;
             if g.cancelled.contains(&id) {
+                g.cancelled.remove(&id);
                 return Err("已取消".to_string());
             }
             if g.child.is_none() {
@@ -397,6 +398,8 @@ fn run_mo_heavy(
                 exit_code = s.code();
             }
         }
+        // 用完即清：集合只增不清会长期累积，也可能干扰同 id 复用
+        g.cancelled.remove(&id);
     }
     if cancelled {
         return Err("已取消".to_string());
@@ -634,7 +637,14 @@ fn sanitize_cache_name(name: &str) -> Result<String, String> {
 
 fn cache_file(name: &str) -> Result<PathBuf, String> {
     let safe = sanitize_cache_name(name)?;
-    Ok(cache_dir()?.join(format!("{safe}.json")))
+    // 过滤字符后不同输入可能同名（如 "A B" 与 "AB"），
+    // 追加原始输入的 FNV-1a 哈希保证键一一对应
+    let mut hash: u64 = 0xcbf29ce484222325;
+    for b in name.as_bytes() {
+        hash ^= *b as u64;
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    Ok(cache_dir()?.join(format!("{safe}-{hash:016x}.json")))
 }
 
 #[cfg(test)]
@@ -667,6 +677,15 @@ mod tests {
     fn sanitize_cache_name_rejects_fully_filtered_names() {
         assert!(sanitize_cache_name("").is_err());
         assert!(sanitize_cache_name("///").is_err());
+    }
+
+    #[test]
+    fn cache_file_distinguishes_inputs_that_sanitize_identically() {
+        let a = cache_file("A B").unwrap();
+        let b = cache_file("AB").unwrap();
+        assert_ne!(a, b);
+        let a2 = cache_file("A B").unwrap();
+        assert_eq!(a, a2);
     }
 }
 
