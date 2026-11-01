@@ -253,15 +253,21 @@ export function ScanProgress({ label, done, jobId, onCancel }: { label: string; 
       : real?.label || label;
   return (
     <div className="panel scan-progress" data-drag style={{ opacity: done ? 0.6 : 1, transition: "opacity .4s ease" }}>
+      {!done && (
+        <div className="scan-fx" aria-hidden="true">
+          <span className="scan-fx-beam" />
+          <span className="scan-fx-streak" />
+        </div>
+      )}
       <div className="scan-progress-head">
-        <span>{head}</span>
+        <span key={real?.label ?? "base"} className="scan-label">{head}</span>
         <span className="scan-elapsed">{pct !== null ? `${Math.round(pct)}%` : `已等待 ${sec}s`}</span>
       </div>
       <div className="scan-progress-bar">
         {pct === null ? (
-          <div className="scan-progress-fill indeterminate" />
+          <div className={`scan-progress-fill${done ? "" : " striped"} indeterminate`} />
         ) : (
-          <div className="scan-progress-fill" style={{ width: `${pct}%`, opacity: done ? 0.4 : 1 }} />
+          <div className={`scan-progress-fill${done ? "" : " striped"}`} style={{ width: `${pct}%`, opacity: done ? 0.4 : 1 }} />
         )}
       </div>
       <div className="scan-progress-foot" style={onCancel ? { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 } : undefined}>
