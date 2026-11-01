@@ -202,32 +202,8 @@ export default function AnalyzeView() {
 
   return (
     <>
-      <div className="crumbs" style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 14, fontSize: 13 }}>
-        {crumbs.map((c, i) => (
-          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-            {i > 0 && <span className="sep" style={{ color: "var(--muted)" }}>›</span>}
-            <button onClick={() => jump(i)} style={{ background: "none", border: 0, color: "var(--accent)", cursor: "pointer", fontSize: 13, padding: 0 }}>{c.label}</button>
-          </span>
-        ))}
-        {data && (
-          <span style={{ marginLeft: "auto", color: "var(--muted)", fontSize: 12 }}>
-            {data.scan_status === "complete" ? "扫描完成" : "部分结果"}
-            {data.total_size ? ` · 共 ${formatBytes(data.total_size)}` : ""}
-            {staleAt ? ` · 上次扫描${formatAgo(staleAt)}` : ""}
-            {phase === "refreshing" ? " · 正在刷新…" : ""}
-          </span>
-        )}
-        <button
-          className="btn ghost sm"
-          style={{ marginLeft: 10 }}
-          onClick={() => load(crumbs[crumbs.length - 1].path, true)}
-          disabled={phase === "scanning" || phase === "refreshing"}
-        >
-          刷新
-        </button>
-      </div>
-
       {error && <div className="error-box">{error}</div>}
+
       {phase === "scanning" && (
         <ScanProgress
           label="正在扫描磁盘占用…"
@@ -246,6 +222,39 @@ export default function AnalyzeView() {
             startedAt={scanStartedAt.current || undefined}
             onCancel={() => moJobCancel(jobId.current).catch(() => {})}
           />
+        </div>
+      )}
+
+      {data && (
+        <section className="panel clean-hero" data-drag>
+          <div>
+            <div className="big">{formatBytes(data.total_size ?? 0)}</div>
+            <div className="desc">
+              磁盘占用 · {data.scan_status === "complete" ? "扫描完成" : "部分结果"}
+              {staleAt ? ` · 上次扫描${formatAgo(staleAt)}` : ""}
+              {phase === "refreshing" ? " · 正在重新扫描…" : ""}
+            </div>
+          </div>
+          <div className="hero-actions">
+            <button
+              className="btn ghost sm"
+              onClick={() => load(crumbs[crumbs.length - 1].path, true)}
+              disabled={phase === "scanning" || phase === "refreshing"}
+            >
+              重新扫描
+            </button>
+          </div>
+        </section>
+      )}
+
+      {crumbs.length > 1 && (
+        <div className="crumbs" style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 14, fontSize: 13 }}>
+          {crumbs.map((c, i) => (
+            <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              {i > 0 && <span className="sep" style={{ color: "var(--muted)" }}>›</span>}
+              <button onClick={() => jump(i)} style={{ background: "none", border: 0, color: "var(--accent)", cursor: "pointer", fontSize: 13, padding: 0 }}>{c.label}</button>
+            </span>
+          ))}
         </div>
       )}
 
