@@ -157,7 +157,7 @@ export default function UninstallView() {
       if (!mounted.current) return;
       setResult(text);
       setLastRun({ name: ran.name, permanent });
-      const raw = await moUninstallList(id);
+      const raw = await moUninstallList(nextJobId());
       const list = parseJson<AppEntry[]>(raw);
       setAppsCache(list);
       if (mounted.current) setApps(list);
