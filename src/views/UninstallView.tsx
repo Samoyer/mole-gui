@@ -28,6 +28,7 @@ export default function UninstallView() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [permanent, setPermanent] = useState(false);
   const [result, setResult] = useState("");
+  const [dropError, setDropError] = useState("");
   const [dropActive, setDropActive] = useState(false);
   const [lastRun, setLastRun] = useState<{ name: string; permanent: boolean } | null>(null);
   const mounted = useRef(true);
@@ -46,7 +47,13 @@ export default function UninstallView() {
   useEffect(() => {
     const win = getCurrentWindow();
     const onDrop = (paths: string[]) => {
-      const appPath = paths.find((p) => p.endsWith(".app")) ?? paths[0];
+      setDropError("");
+      const appPath = paths.find((p) => p.endsWith(".app"));
+      if (!appPath) {
+        // 拖入的不是应用就把操作挡在 UI 层，不能拿任意路径名去碰 mo uninstall
+        setDropError("只能拖入 .app 应用");
+        return;
+      }
       if (!appPath) return;
       const base = appPath.split("/").filter(Boolean).pop() ?? "";
       const name = base.endsWith(".app") ? base.slice(0, -4) : base;
@@ -244,6 +251,7 @@ export default function UninstallView() {
               <div className="clean-hero-empty">
                 <div className="big" style={{ fontSize: 15 }}>在左侧选择一个应用</div>
                 <div className="desc">或把 .app 从访达拖进窗口，选中后会显示卸载预览</div>
+              {dropError && <div className="error-box" style={{ marginTop: 10 }}>{dropError}</div>}
               </div>
             </section>
           )}
