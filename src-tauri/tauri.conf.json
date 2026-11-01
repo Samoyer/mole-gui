@@ -15,7 +15,7 @@
         "title": "Mole",
         "width": 1060,
         "height": 700,
-        "minWidth": 900,
+        "minWidth": 780,
         "minHeight": 600,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,

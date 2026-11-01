@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { moStatusWatchStart, moVersion } from "./lib/mole";
+import { currentNav, subscribeNav, type NavKey as StoreNavKey } from "./lib/nav";
 import {
   IconDisk,
   IconGauge,
@@ -11,9 +12,9 @@ import StatusView from "./views/StatusView";
 import CleanView from "./views/CleanView";
 import UninstallView from "./views/UninstallView";
 import AnalyzeView from "./views/AnalyzeView";
-import { AppearancePicker, useAppearanceTheme } from "./AppearancePicker";
+import { useAppearanceTheme } from "./AppearancePicker";
 
-type NavKey = "status" | "clean" | "uninstall" | "analyze";
+type NavKey = StoreNavKey;
 
 const NAV: { key: NavKey; label: string; icon: ReactNode }[] = [
   { key: "status", label: "状态总览", icon: <IconGauge /> },
@@ -30,9 +31,11 @@ const TITLES: Record<NavKey, { title: string; subtitle: string }> = {
 };
 
 export default function App() {
-  const [nav, setNav] = useState<NavKey>("status");
+  const [nav, setNav] = useState<NavKey>(currentNav);
   const [version, setVersion] = useState("");
   const [theme, setTheme] = useAppearanceTheme();
+
+  useEffect(() => subscribeNav((key) => setNav(key)), []);
 
   useEffect(() => {
     const appWindow = getCurrentWindow();
@@ -85,6 +88,14 @@ export default function App() {
         </nav>
         <div className="sidebar-spacer" />
         <div className="side-foot">
+          <button
+            className="icon-btn theme-toggle"
+            title="外观：默认跟随系统，点按可手动切换深浅色"
+            aria-label="切换外观"
+            onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+          >
+            {theme === "light" ? "🌙" : "☀️"}
+          </button>
           <div className="version">{version}</div>
         </div>
       </aside>
@@ -93,9 +104,6 @@ export default function App() {
         <header className="topbar" data-drag>
           <div className="crumb">
             <strong>{TITLES[nav].title}</strong>
-          </div>
-          <div className="top-actions">
-            <AppearancePicker theme={theme} onThemeChange={() => setTheme(theme === "light" ? "dark" : "light")} />
           </div>
         </header>
 

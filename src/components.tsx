@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { onMoProgress } from "./lib/mole";
+import { translateScanLabel } from "./i18n/zh-CN";
 
 /* ---------- Icons (24x24 stroke, SF-Symbol-like weights) ---------- */
 
@@ -249,11 +250,12 @@ export function ScanProgress({ label, done, jobId, onCancel, startedAt: startedA
   }, [jobId]);
   // total=0 的进度事件是"静默提醒"（真实删除被看门狗豁免后的提示），不是百分比
   const pct = done ? 100 : real && real.total > 0 ? Math.min(95, (real.done / real.total) * 100) : null;
+  const realLabel = real?.label ? translateScanLabel(real.label) : "";
   const head = done
     ? "扫描完成"
     : real && real.total > 0
-      ? `正在扫描 ${real.done}/${real.total} 类 · ${real.label || "…"}`
-      : real?.label || label;
+      ? `正在扫描 ${real.done}/${real.total} 类 · ${realLabel || "…"}`
+      : realLabel || label;
   return (
     <div className="panel scan-progress" data-drag style={{ opacity: done ? 0.6 : 1, transition: "opacity .4s ease" }}>
       {!done && (
@@ -263,7 +265,7 @@ export function ScanProgress({ label, done, jobId, onCancel, startedAt: startedA
         </div>
       )}
       <div className="scan-progress-head">
-        <span key={real?.label ?? "base"} className="scan-label">{head}</span>
+        <span key={realLabel || "base"} className="scan-label">{head}</span>
         <span className="scan-elapsed">{pct !== null ? `${Math.round(pct)}%` : `已等待 ${sec}s`}</span>
       </div>
       <div className="scan-progress-bar">

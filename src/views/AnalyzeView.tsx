@@ -19,6 +19,7 @@ import {
 import { IconFile, IconFolder, IconReveal, ScanProgress } from "../components";
 import Treemap from "../components/Treemap";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { navigate, consumeNavParams } from "../lib/nav";
 
 interface Crumb {
   label: string;
@@ -51,6 +52,7 @@ export default function AnalyzeView() {
   const [crumbs, setCrumbs] = useState<Crumb[]>([{ label: "概览", path: null }]);
   const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [phase, setPhase] = useState<InitPhase>("init");
+  const [highlightLarge, setHighlightLarge] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scanDone, setScanDone] = useState(false);
   const mounted = useRef(true);
@@ -138,6 +140,8 @@ export default function AnalyzeView() {
 
   useEffect(() => {
     mounted.current = true;
+    // 任务链入口：深度清理页"查看大文件"跳来时高亮大文件区
+    if (consumeNavParams()?.focus === "large") setHighlightLarge(true);
     hasContent.current = !!getAnalyzeCached(analyzeOverviewKey);
     if (hasContent.current) {
       const hit = getAnalyzeCached(analyzeOverviewKey)!;
@@ -195,6 +199,14 @@ export default function AnalyzeView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (highlightLarge && data?.large_files?.length) {
+      document.getElementById("large-files-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const timer = window.setTimeout(() => setHighlightLarge(false), 2200);
+      return () => window.clearTimeout(timer);
+    }
+  }, [highlightLarge, data]);
+
   const drill = (path: string, label: string) => {
     if (jobInFlight.current) return;
     setCrumbs((c) => [...c, { label, path }]);
@@ -210,7 +222,6 @@ export default function AnalyzeView() {
 
   const entries = data?.entries ?? [];
   // 用 reduce 代替 spread，避免 entries 过大时触发调用栈限制
-  const max = entries.reduce((acc, e) => Math.max(acc, e.size), 1);
 
   const reveal = (ev: { stopPropagation?: () => void }, path: string) => {
     ev.stopPropagation?.();
@@ -251,12 +262,24 @@ export default function AnalyzeView() {
           <div>
             <div className="big">{formatBytes(data.total_size ?? 0)}</div>
             <div className="desc">
-              磁盘占用 · {data.scan_status === "complete" ? "扫描完成" : "部分结果"}
+              磁盘占用 ·{" "}
+              {data.scan_status === "complete" ? (
+                "扫描完成"
+              ) : (
+                <span className="tip" title="仅统计当前用户可读的目录，系统目录未包含，实际占用会更高">
+                  部分结果
+                </span>
+              )}
               {staleAt ? ` · 上次扫描${formatAgo(staleAt)}` : ""}
               {phase === "refreshing" ? " · 正在重新扫描…" : ""}
             </div>
           </div>
           <div className="hero-actions">
+            {crumbs.length === 1 && (
+              <button className="btn ghost sm" onClick={() => navigate("clean", { focus: "cache" })}>
+                去清理缓存
+              </button>
+            )}
             <button
               className="btn ghost sm"
               onClick={() => load(crumbs[crumbs.length - 1].path, true)}
@@ -313,7 +336,17 @@ export default function AnalyzeView() {
 
           {data.large_files && data.large_files.length > 0 && (
             <>
-              <div className="section-title" style={{ margin: "22px 0 12px" }}>
+              <div
+                id="large-files-section"
+                className="section-title"
+                style={{
+                  margin: "22px 0 12px",
+                  transition: "background .5s ease",
+                  background: highlightLarge ? "color-mix(in srgb, var(--ui-blue) 12%, transparent)" : "transparent",
+                  borderRadius: 8,
+                  padding: "4px 8px",
+                }}
+              >
                 大文件
                 <span className="hint">当前范围内最大的文件 · 点眼睛在访达中查看</span>
               </div>
@@ -362,9 +395,6 @@ export default function AnalyzeView() {
                     <div className="name">{e.name}</div>
                   </div>
                   <div className="row-right">
-                    <div className="progress-wrap">
-                      <div className="progress-track"><i className={e.size / max > 0.85 ? "orange" : ""} style={{ width: `${Math.max(1.5, (e.size / max) * 100)}%` }} /></div>
-                    </div>
                     <span className="num">{formatBytes(e.size)}</span>
                     <button className="icon-btn" title="在访达中显示" onClick={(ev) => reveal(ev, e.path)}>
                       <IconReveal size={14} />

@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   moCleanPreview,
   moCleanRun,
@@ -10,6 +10,9 @@ import {
   type CleanReport,
 } from "../lib/mole";
 import { ConfirmSheet, ScanProgress } from "../components";
+import { navigate, consumeNavParams } from "../lib/nav";
+import { translateCategory, translateItemName } from "../i18n/zh-CN";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   CLEAN_CACHE_TTL,
   getCleanCached,
@@ -140,6 +143,15 @@ async function runCleanAction() {
 
 export default function CleanView() {
   const snap = useSyncExternalStore(subscribeClean, getCleanSnapshot);
+  const [focus, setFocus] = useState<string | null>(null);
+
+  // 任务链入口：其他页面带 focus 参数跳来时，只显示对应分类
+  useEffect(() => {
+    const params = consumeNavParams();
+    if (params?.focus) {
+      setFocus(params.focus);
+    }
+  }, []);
 
   useEffect(() => {
     if (cacheInitialized) return;
@@ -173,13 +185,14 @@ export default function CleanView() {
     );
   if (snap.phase === "init" && !snap.report) {
     return (
-      <section className="panel clean-hero" data-drag>
+      <div className="clean-empty-center" data-drag>
         <div className="clean-hero-empty">
-          <div className="big">{formatBytes(0)}</div>
-          <div className="desc">点击开始扫描，查找可清理的缓存、日志和临时文件</div>
+          <div className="empty-icon">🧹</div>
+          <div className="empty-title">尚未扫描</div>
+          <div className="desc">扫描缓存、日志和临时文件，找出可安全清理的内容</div>
           <button className="btn primary" onClick={() => startScan(true)}>开始扫描</button>
         </div>
-      </section>
+      </div>
     );
   }
   if (!snap.report) return null;
@@ -187,12 +200,22 @@ export default function CleanView() {
   const report = snap.report;
   const phase = snap.phase;
   const showHero = phase === "preview" || phase === "confirm";
+  const visibleCategories = focus
+    ? report.categories.filter((cat) => {
+        const n = cat.name.toLowerCase();
+        if (focus === "cache") return n.includes("cache");
+        if (focus === "logs") return n.includes("log");
+        if (focus === "trash") return n.includes("trash");
+        return true;
+      })
+    : report.categories;
 
   return (
     <>
-      {report.sudoNote && (
-        <div className="notice-box">
-          部分系统缓存需要管理员权限才能预览，本次仅显示用户空间可清理的内容。
+      {focus && (
+        <div className="notice-box" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span>正在按来源页面的意图筛选清理项</span>
+          <button className="inline-link-btn" onClick={() => setFocus(null)}>取消筛选</button>
         </div>
       )}
 
@@ -216,6 +239,9 @@ export default function CleanView() {
             </div>
           </div>
           <div className="hero-actions">
+            <button className="btn ghost sm" onClick={() => navigate("analyze", { focus: "large" })}>
+              查看大文件
+            </button>
             <button className="btn ghost sm" onClick={() => startScan(true)} disabled={phase !== "preview" || snap.refreshing}>
               重新扫描
             </button>
@@ -231,10 +257,10 @@ export default function CleanView() {
       )}
 
       {(phase === "preview" || phase === "confirm") &&
-        report.categories.map((cat) => (
+        visibleCategories.map((cat) => (
           <div key={cat.name} style={{ marginTop: 18 }}>
             <div className="section-title" style={{ margin: "0 0 10px" }}>
-              {cat.name}
+              {translateCategory(cat.name)}
               <span className="hint">
                 {cat.items.filter((i) => i.mark === "clean" && i.bytes !== null && i.bytes > 0).length} 项可清理
               </span>
@@ -247,7 +273,18 @@ export default function CleanView() {
                       {MARK_TEXT[item.mark]}
                     </span>
                     <div className="grow">
-                      <div className="name">{item.name}</div>
+                      <div className="name">{translateItemName(item.name)}</div>
+                    {item.mark === "skip" && report.sudoNote && (
+                      <div className="skip-reason">
+                        需要管理员权限，未能预览。{" "}
+                        <button
+                          className="inline-link-btn"
+                          onClick={() => openUrl("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles").catch(() => {})}
+                        >
+                          去授权
+                        </button>
+                      </div>
+                    )}
                     </div>
                     {item.sizeText && <span className="num">{item.sizeText}</span>}
                     {item.mark === "clean" && <span className="pill info">可清理</span>}

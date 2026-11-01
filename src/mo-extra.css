@@ -171,7 +171,7 @@ dialog.confirm-sheet .sheet-actions { display: flex; justify-content: flex-end; 
 /* 用固定列宽的 grid 替代 flex，保证每行右侧元素纵向对齐 */
 .row-right {
   display: grid;
-  grid-template-columns: 56px 64px 30px 48px;
+  grid-template-columns: 64px 30px 48px;
   align-items: center;
   gap: 8px;
   flex: none;
@@ -260,3 +260,213 @@ dialog.confirm-sheet .sheet-actions { display: flex; justify-content: flex-end; 
 .tm-3 { fill: color-mix(in srgb, var(--accent) 66%, var(--accent-2)); }
 .tm-4 { fill: color-mix(in srgb, var(--accent) 52%, var(--accent-2)); }
 .tm-5 { fill: color-mix(in srgb, var(--accent) 42%, var(--accent-2)); }
+
+/* ============================================================
+   Mole GUI · 视觉规范层（iOS 分组列表 + 强调色纪律 + 字阶）
+   本层在所有主题层之后加载，统一收口：
+   - 浅色页面底 #F5F5F7；信息展示用 iOS 分组列表；卡片只留给操作中心
+   - 绿色只允许出现在主按钮与关键数字；其余一律中性/蓝色
+   - 字阶：主数字 28/semibold，次级数字 17/regular，标签 12 灰
+   ============================================================ */
+
+:root {
+  --ui-green: #34c759;
+  --ui-green-deep: #2e9e4a;
+  --ui-blue: #3478f6;
+  --ui-pill-gray: #e9e9ee;
+  --num-lg: 28px;
+  --num-md: 17px;
+  --label-size: 12px;
+  --label-color: #86868b;
+  --group-bg: #ffffff;
+  --group-line: rgba(60, 60, 67, 0.12);
+}
+html[data-theme="dark"] {
+  --label-color: #98989d;
+  --ui-green: #30d158;
+  --ui-green-deep: #25a244;
+  --ui-pill-gray: #2c2c2e;
+  --group-bg: color-mix(in srgb, var(--surface) 92%, #000);
+  --group-line: rgba(84, 84, 88, 0.4);
+}
+
+/* ---------- 页面底色（浅色固定 #F5F5F7，不再米黄） ---------- */
+html:not([data-theme="dark"]) body { background: #f5f5f7; }
+html:not([data-theme="dark"]) .app { background: #f5f5f7; }
+html:not([data-theme="dark"]) .topbar { background: rgba(245, 245, 247, 0.86); }
+html:not([data-theme="dark"]) .sidebar {
+  background: rgba(240, 240, 243, 0.92);
+  border-right: 1px solid rgba(60, 60, 67, 0.1);
+}
+
+/* ---------- 断词纪律：自然语言禁止词中断行，路径才允许 ---------- */
+.app, .app * { word-break: normal; overflow-wrap: normal; }
+.app .pre-output,
+.app .path-mono,
+.app [data-break="path"] { word-break: break-all; }
+.path-mono {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11.5px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 字阶 ---------- */
+.stat-num-lg { font-size: var(--num-lg); font-weight: 600; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+.stat-num-lg em { font-style: normal; font-size: 17px; font-weight: 500; margin-left: 1px; }
+.stat-num-md { font-size: var(--num-md); font-weight: 400; color: var(--text); font-variant-numeric: tabular-nums; }
+.stat-label { font-size: var(--label-size); color: var(--label-color); line-height: 1.5; }
+.num-key { color: var(--ui-green); }
+
+/* ---------- 强调色纪律 ---------- */
+.btn.primary {
+  background: var(--ui-green) !important;
+  color: #fff !important;
+}
+.btn.primary:hover { background: var(--ui-green-deep) !important; }
+html[data-theme="dark"] .btn.primary,
+html[data-theme="dark"] .btn.primary:hover { color: #0b1a0e !important; }
+
+/* 侧边栏激活：整行圆角中性 pill，无绿色、无左竖条 */
+.nav-item { border-radius: 8px; }
+.nav-item.active,
+html[data-theme="dark"] .nav-item.active {
+  background: var(--ui-pill-gray);
+  color: var(--text);
+  box-shadow: none;
+}
+.nav-item.active .ic,
+html[data-theme="dark"] .nav-item.active .ic { color: var(--text); }
+.nav-item.active strong { color: var(--text); }
+.nav-item.active small { color: var(--muted); }
+.nav-item.active::before { display: none; }
+.nav-item:hover:not(.active) { background: color-mix(in srgb, var(--ui-pill-gray) 55%, transparent); color: var(--text); }
+
+/* 徽标统一中性/蓝色，不再吃 accent 绿 */
+.pill { border: 1px solid transparent; }
+.pill.info { color: var(--ui-blue); background: color-mix(in srgb, var(--ui-blue) 10%, transparent); }
+.pill.warn { color: #b25000; background: color-mix(in srgb, #ff9500 14%, transparent); }
+html[data-theme="dark"] .pill.warn { color: #ffb340; }
+.pill.ok { color: var(--muted); background: var(--ui-pill-gray); }
+.pill.idle { color: var(--muted); background: color-mix(in srgb, var(--muted) 10%, transparent); }
+.badge-sys {
+  display: inline-block; padding: 1px 7px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600; color: var(--muted);
+  background: var(--ui-pill-gray); margin-left: 6px; vertical-align: 1px;
+}
+
+/* 侧栏底部外观切换 */
+.theme-toggle { margin: 0; }
+.side-foot { justify-content: space-between; }
+
+/* ---------- iOS 分组列表（展示型信息） ---------- */
+.ios-group {
+  background: var(--group-bg);
+  border: 1px solid var(--group-line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.ios-group .ios-head {
+  padding: 10px 16px 4px;
+  font-size: var(--label-size);
+  color: var(--label-color);
+}
+.ios-group .mrow {
+  padding: 10px 16px;
+  border-top: 1px solid var(--group-line);
+  font-size: 13px;
+}
+.ios-group .mrow:first-of-type { border-top: 0; }
+.ios-row-value { font-size: var(--num-md); color: var(--text); font-variant-numeric: tabular-nums; }
+.ios-row-sub { font-size: 11px; color: var(--label-color); margin-top: 1px; }
+
+/* 悬停提示（部分结果 / 接口名等） */
+.tip {
+  text-decoration: underline dotted color-mix(in srgb, var(--label-color) 70%, transparent);
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+/* ---------- 树图：单一色相（蓝灰）由深到浅，深=占用大 ---------- */
+.tm-0 { fill: #3d4e63; }
+.tm-1 { fill: #4a5c73; }
+.tm-2 { fill: #5d7189; }
+.tm-3 { fill: #7c8ea3; }
+.tm-4 { fill: #9fadbd; }
+.tm-5 { fill: #bcc7d3; }
+html[data-theme="dark"] .tm-0 { fill: #55677e; }
+html[data-theme="dark"] .tm-1 { fill: #61748c; }
+html[data-theme="dark"] .tm-2 { fill: #74879e; }
+html[data-theme="dark"] .tm-3 { fill: #8a9cb1; }
+html[data-theme="dark"] .tm-4 { fill: #a3b2c2; }
+html[data-theme="dark"] .tm-5 { fill: #bcc8d4; }
+
+/* ---------- 健康仪表盘（状态总览） ---------- */
+.dash-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: stretch; }
+.dash-card {
+  background: var(--group-bg);
+  border: 1px solid var(--group-line);
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: flex; flex-direction: column; gap: 6px;
+  min-width: 0;
+}
+.dash-card .dash-title { font-size: var(--label-size); color: var(--label-color); }
+.dash-card .dash-main { display: flex; align-items: baseline; gap: 8px; }
+.dash-card .dash-sub { font-size: 12px; color: var(--label-color); }
+.dash-card .dash-actions { margin-top: auto; padding-top: 10px; display: flex; gap: 8px; }
+.health-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.health-dot.good { background: var(--ui-green); }
+.health-dot.warn { background: #ff9500; }
+.health-dot.unknown { background: var(--muted); }
+
+/* 专业模式折叠区 */
+.pro-mode { border: 1px solid var(--group-line); border-radius: 14px; overflow: hidden; background: color-mix(in srgb, var(--group-bg) 55%, transparent); }
+.pro-mode > summary {
+  list-style: none; cursor: pointer; padding: 12px 18px;
+  font-size: 13px; font-weight: 600; color: var(--text-2);
+  display: flex; align-items: center; gap: 8px; user-select: none;
+}
+.pro-mode > summary::-webkit-details-marker { display: none; }
+.pro-mode > summary::after { content: "›"; margin-left: auto; transform: rotate(90deg); color: var(--muted); transition: transform .2s; }
+.pro-mode[open] > summary::after { transform: rotate(-90deg); }
+.pro-mode .pro-body { padding: 4px 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ---------- 清理页空状态（垂直居中） ---------- */
+.clean-empty-center {
+  min-height: calc(100vh - 200px);
+  display: grid; place-items: center;
+}
+.clean-empty-center .empty-icon {
+  width: 56px; height: 56px; border-radius: 16px; margin: 0 auto 14px;
+  display: grid; place-items: center;
+  background: var(--ui-pill-gray); color: var(--muted);
+}
+.clean-empty-center .empty-title { font-size: 17px; font-weight: 600; color: var(--text); }
+.clean-empty-center .empty-sub { font-size: var(--label-size); color: var(--label-color); margin: 6px 0 18px; }
+
+/* 跳过项就地原因 + 去授权 */
+.skip-reason { font-size: 11px; color: var(--label-color); margin-top: 1px; }
+.inline-link-btn {
+  background: none; border: 0; padding: 0; font: inherit; font-size: 11.5px;
+  color: var(--ui-blue); cursor: pointer;
+}
+.inline-link-btn:hover { text-decoration: underline; }
+
+/* 自然语言卸载预览 */
+.uninst-nl { font-size: 13.5px; line-height: 1.75; color: var(--text-2); }
+.uninst-nl b { color: var(--text); }
+.uninst-nl .nl-section { margin: 10px 0; }
+details.tech-details { margin-top: 10px; }
+details.tech-details > summary {
+  cursor: pointer; font-size: 12px; color: var(--muted); user-select: none;
+}
+details.tech-details > summary:hover { color: var(--text-2); }
+
+/* 宽度收窄：800px 以下仪表盘单列、卸载分栏堆叠 */
+@media (max-width: 860px) {
+  .dash-grid { grid-template-columns: 1fr; }
+  .split-view { grid-template-columns: 1fr; }
+}

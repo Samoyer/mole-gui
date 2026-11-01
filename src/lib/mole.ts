@@ -161,6 +161,78 @@ export function parseJson<T>(raw: string): T {
   return JSON.parse(raw) as T;
 }
 
+/* ---------- 卸载预览解析：技术输出 → 自然语言要素 ---------- */
+
+export interface UninstallPreview {
+  appName: string;
+  appSize: string | null;
+  lastUsedRaw: string | null;
+  files: { path: string; size: string | null }[];
+  reviewOnly: string[];
+  kept: string[];
+  raw: string;
+}
+
+const UNINSTALL_SIZE_RE = /([\d.]+)\s*(B|KB|MB|GB|TB)\b/i;
+
+export function parseUninstallPreview(text: string, appName: string): UninstallPreview {
+  const preview: UninstallPreview = {
+    appName,
+    appSize: null,
+    lastUsedRaw: null,
+    files: [],
+    reviewOnly: [],
+    kept: [],
+    raw: text,
+  };
+  let section: "none" | "remove" | "review" | "kept" = "none";
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (/^Matched \d+ app/i.test(trimmed)) {
+      const size = trimmed.match(UNINSTALL_SIZE_RE);
+      if (size) preview.appSize = `${size[1]}${size[2].toUpperCase()}`;
+      const last = trimmed.match(/Last:\s*\S+\s+ago/i);
+      preview.lastUsedRaw = last ? last[0] : null;
+      continue;
+    }
+    if (/^Files to be removed/i.test(trimmed)) {
+      section = "remove";
+      continue;
+    }
+    if (/^Review only/i.test(trimmed)) {
+      section = "review";
+      continue;
+    }
+    if (/^Personal data kept/i.test(trimmed)) {
+      section = "kept";
+      continue;
+    }
+    if (/^(choose personal data|Run mo uninstall|Uninstall confirmation|no apps were removed)/i.test(trimmed)) {
+      section = "none";
+      continue;
+    }
+    if (section === "remove") {
+      // "✓ /Applications/X.app , 156.6MB" / "◎ 组名 , 156.6MB"（组名非路径，跳过）
+      const m = trimmed.match(/^[✓◎✗]\s+(.+?)(?:\s*,\s*([\d.]+\s*\w+))?$/);
+      if (m && m[1].startsWith("/")) {
+        const sz = m[2]?.match(UNINSTALL_SIZE_RE);
+        preview.files.push({
+          path: m[1].trim(),
+          size: sz ? `${sz[1]}${sz[2].toUpperCase()}` : null,
+        });
+      }
+    } else if (section === "review") {
+      const m = trimmed.match(/^[⊙✓◎]\s+(.+)$/);
+      if (m) preview.reviewOnly.push(m[1].trim());
+    } else if (section === "kept") {
+      const m = trimmed.match(/^[⊙✓◎]\s+(.+)$/);
+      if (m) preview.kept.push(m[1].trim());
+    }
+  }
+  return preview;
+}
+
 /* ---------- Clean preview text parser ---------- */
 
 export interface CleanItem {

@@ -10,8 +10,12 @@ import {
   isCancelError,
   parseJson,
   type AppEntry,
+  parseUninstallPreview,
+  type UninstallPreview,
 } from "../lib/mole";
 import { getAppsCache, setAppsCache } from "../lib/cache";
+import { navigate } from "../lib/nav";
+import { formatLastUsedZh } from "../i18n/zh-CN";
 import { ConfirmSheet, IconSearch } from "../components";
 
 type Phase = "loading" | "ready" | "confirm" | "running";
@@ -25,14 +29,15 @@ export default function UninstallView() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<AppEntry | null>(null);
-  const [preview, setPreview] = useState("");
+  const [preview, setPreview] = useState<UninstallPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [permanent, setPermanent] = useState(false);
   const [result, setResult] = useState("");
   const [runFailed, setRunFailed] = useState(false);
   const [dropError, setDropError] = useState("");
   const [dropActive, setDropActive] = useState(false);
-  const [lastRun, setLastRun] = useState<{ name: string; permanent: boolean } | null>(null);
+  const [lastRun, setLastRun] = useState<{ name: string; permanent: boolean; size: string } | null>(null);
   const mounted = useRef(true);
   const appsRef = useRef<AppEntry[]>([]);
   const previewReq = useRef(0);
@@ -124,13 +129,14 @@ export default function UninstallView() {
   const pick = async (app: AppEntry) => {
     setSelected(app);
     setResult("");
+    setPreviewError(null);
     const cached = previewCache.get(app.uninstall_name);
     if (cached && Date.now() - cached.at < PREVIEW_CACHE_TTL) {
-      setPreview(cached.text);
+      setPreview(parseUninstallPreview(cached.text, app.name));
       setPreviewLoading(false);
       return;
     }
-    setPreview("");
+    setPreview(null);
     setPreviewLoading(true);
     const req = ++previewReq.current;
     const jid = nextJobId();
@@ -139,10 +145,11 @@ export default function UninstallView() {
     try {
       const text = await moUninstallPreview(app.uninstall_name, jid);
       previewCache.set(app.uninstall_name, { text, at: Date.now() });
-      if (mounted.current && req === previewReq.current) setPreview(text);
+      if (mounted.current && req === previewReq.current)
+        setPreview(parseUninstallPreview(text, app.name));
     } catch (e) {
       if (mounted.current && req === previewReq.current && !isCancelError(e))
-        setPreview(String(e));
+        setPreviewError(String(e));
     } finally {
       previewInFlight.current = false;
       if (mounted.current && req === previewReq.current) setPreviewLoading(false);
@@ -162,7 +169,7 @@ export default function UninstallView() {
       setResult(text);
       // 失败时不能显示"已删除"横幅，也不能假装列表是最新的
       if (!failed) {
-        setLastRun({ name: ran.name, permanent });
+        setLastRun({ name: ran.name, permanent, size: ran.size });
         const raw = await moUninstallList(nextJobId());
         const list = parseJson<AppEntry[]>(raw);
         setAppsCache(list);
@@ -233,7 +240,7 @@ export default function UninstallView() {
                 >
                   <div className="grow">
                     <div className="name">{app.name}</div>
-                    <div className="sub">{app.path}</div>
+                    <div className="ios-row-sub">{app.size || "大小未知"}</div>
                   </div>
                   <span className={`pill ${app.source === "App Store" ? "info" : app.source === "拖拽" ? "warn" : "idle"}`}>{app.source}</span>
                 </div>
@@ -274,22 +281,63 @@ export default function UninstallView() {
               </div>
 
               <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>卸载预览</div>
-              <pre style={{
-                margin: 0,
-                fontFamily: "ui-monospace, Consolas, monospace",
-                fontSize: 12,
-                lineHeight: 1.6,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-all",
-                maxHeight: 280,
-                overflow: "auto",
-                padding: 12,
-                borderRadius: `calc(12px * var(--corner-scale, 1))`,
-                background: "color-mix(in srgb, var(--text) 4%, transparent)",
-                color: "var(--text-2)",
-              }}>
-                {previewLoading ? "正在生成卸载预览…" : preview || "（预览无内容）"}
-              </pre>
+              {previewLoading ? (
+                <div className="stat-label" style={{ padding: "12px 0" }}>正在生成卸载预览…</div>
+              ) : previewError ? (
+                <div className="error-box">{previewError}</div>
+              ) : preview ? (
+                <div className="uninst-nl">
+                  <div className="nl-section">预览模式：不会删除任何文件</div>
+                  <div className="nl-section">
+                    将移除 <b>{preview.appName}</b>
+                    {preview.appSize && <> 本体（{preview.appSize}）</>}
+                    {(() => {
+                      const support = preview.files.filter((f) => !f.path.endsWith(".app"));
+                      if (support.length === 0) return null;
+                      const sizes = support.map((f) => f.size).filter(Boolean) as string[];
+                      return (
+                        <>
+                          {" "}及支持文件（{support.length} 处{sizes.length > 0 ? `，约 ${sizes.join(" + ")}` : ""}）
+                        </>
+                      );
+                    })()}
+                    {preview.lastUsedRaw && (() => {
+                      const zh = formatLastUsedZh(preview.lastUsedRaw);
+                      return zh ? <>，最近使用：{zh}</> : null;
+                    })()}
+                  </div>
+                  {preview.kept.length > 0 && (
+                    <div className="nl-section">
+                      你的项目、录音等个人数据将保留
+                      <div style={{ marginTop: 4 }}>
+                        {preview.kept.slice(0, 8).map((k) => (
+                          <div key={k} className="path-mono" data-break="path" title={k} style={{ maxWidth: 420 }}>
+                            {k}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {preview.reviewOnly.length > 0 && (
+                    <div className="nl-section">
+                      以下内容仅审查，不会删除：
+                      <div style={{ marginTop: 4 }}>
+                        {preview.reviewOnly.slice(0, 6).map((k) => (
+                          <div key={k} className="path-mono" data-break="path" title={k} style={{ maxWidth: 420 }}>
+                            {k}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <details className="tech-details">
+                    <summary>技术详情（原始输出）</summary>
+                    <pre className="pre-output" style={{ maxHeight: 240, overflow: "auto", marginTop: 8 }}>{preview.raw}</pre>
+                  </details>
+                </div>
+              ) : (
+                <div className="stat-label" style={{ padding: "12px 0" }}>（预览无内容）</div>
+              )}
 
               <label
                 style={{
@@ -346,6 +394,10 @@ export default function UninstallView() {
                     {lastRun.permanent
                       ? "已彻底删除，文件不可恢复。"
                       : "已移到废纸篓 — 如需恢复，打开废纸篓右键「放回原处」。"}
+                    {lastRun.size && <span> 已释放 {lastRun.size}。</span>}
+                    <div style={{ marginTop: 10 }}>
+                      <button className="btn ghost sm" onClick={() => navigate("status")}>返回状态总览</button>
+                    </div>
                   </div>
                 </section>
               )}
