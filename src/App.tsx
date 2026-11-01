@@ -41,7 +41,7 @@ export default function App() {
       if (!t || typeof t.closest !== "function") return;
       const card = t.closest(".panel[data-drag], .sidebar[data-drag]");
       const header = t.closest(".topbar[data-drag], .page-title, .page-subtitle");
-      const interactive = t.closest("button, a, input, select, textarea, [role='button'], .mrow, .row, [data-no-drag]");
+      const interactive = t.closest("button, a, input, select, textarea, svg, [role='button'], .mrow, .row, [data-no-drag]");
       if ((card || header) && !interactive) {
         appWindow.startDragging();
       }

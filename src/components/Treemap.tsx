@@ -110,8 +110,8 @@ export default function Treemap({
   if (rects.length === 0) return null;
 
   return (
-    <div className="panel panel-pad">
-      <div className="treemap-wrap">
+    <div className="panel panel-pad" data-drag>
+      <div className="treemap-wrap" data-no-drag>
       <svg
         viewBox={`0 0 ${W} ${H}`}
         style={{ display: "block", width: "100%", height: "auto", borderRadius: 8 }}

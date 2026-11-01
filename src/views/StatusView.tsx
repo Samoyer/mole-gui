@@ -31,12 +31,19 @@ export default function StatusView() {
     let heartbeatTimer: number | null = null;
     let lastRef = getStatusCache();
     let lastFrameAt = lastRef ? Date.now() : 0;
+    let lastHardwareAt = lastRef?.hardware?.model ? Date.now() : 0;
     let polling = false;
 
     const applyRaw = (raw: string) => {
       const next = parseJson<StatusData>(raw);
       if (lastRef) {
-        if (!next.hardware?.model) next.hardware = lastRef.hardware;
+        // 硬件信息只在 2 分钟内从上一帧接力：mo 输出格式变化导致字段
+        // 永久缺失时，宁可显示未知也不能把旧机器信息无限期展示下去
+        if (next.hardware?.model) {
+          lastHardwareAt = Date.now();
+        } else if (lastRef.hardware && Date.now() - lastHardwareAt < 120000) {
+          next.hardware = lastRef.hardware;
+        }
         if ((!next.top_processes || next.top_processes.length === 0) && lastRef.top_processes) {
           next.top_processes = lastRef.top_processes;
         }
