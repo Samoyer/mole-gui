@@ -6,6 +6,7 @@ import {
   moUninstallRun,
   moJobCancel,
   nextJobId,
+  uninstallRunFailed,
   isCancelError,
   parseJson,
   type AppEntry,
@@ -28,6 +29,7 @@ export default function UninstallView() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [permanent, setPermanent] = useState(false);
   const [result, setResult] = useState("");
+  const [runFailed, setRunFailed] = useState(false);
   const [dropError, setDropError] = useState("");
   const [dropActive, setDropActive] = useState(false);
   const [lastRun, setLastRun] = useState<{ name: string; permanent: boolean } | null>(null);
@@ -155,12 +157,17 @@ export default function UninstallView() {
     try {
       const text = await moUninstallRun(selected.uninstall_name, permanent, id);
       if (!mounted.current) return;
+      const failed = uninstallRunFailed(text);
+      setRunFailed(failed);
       setResult(text);
-      setLastRun({ name: ran.name, permanent });
-      const raw = await moUninstallList(nextJobId());
-      const list = parseJson<AppEntry[]>(raw);
-      setAppsCache(list);
-      if (mounted.current) setApps(list);
+      // 失败时不能显示"已删除"横幅，也不能假装列表是最新的
+      if (!failed) {
+        setLastRun({ name: ran.name, permanent });
+        const raw = await moUninstallList(nextJobId());
+        const list = parseJson<AppEntry[]>(raw);
+        setAppsCache(list);
+        if (mounted.current) setApps(list);
+      }
     } catch (e) {
       if (mounted.current) setResult(String(e));
     } finally {
@@ -343,7 +350,9 @@ export default function UninstallView() {
                 </section>
               )}
               <section className="panel panel-pad" style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>执行结果</div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: runFailed ? "var(--danger)" : undefined }}>
+                  {runFailed ? "卸载未执行" : "执行结果"}
+                </div>
                 <pre style={{
                   margin: 0,
                   fontFamily: "ui-monospace, Consolas, monospace",
@@ -356,7 +365,7 @@ export default function UninstallView() {
                   {result}
                 </pre>
               </section>
-              <button className="btn ghost sm" onClick={() => setResult("")}>关闭</button>
+              <button className="btn ghost sm" onClick={() => { setResult(""); setRunFailed(false); }}>关闭</button>
             </>
           )}
         </div>

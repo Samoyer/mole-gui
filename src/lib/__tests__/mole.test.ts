@@ -4,6 +4,7 @@ import {
   formatRate,
   parseCleanPreview,
   parseJson,
+  uninstallRunFailed,
 } from "../mole";
 
 describe("formatBytes", () => {
@@ -79,5 +80,21 @@ describe("parseCleanPreview", () => {
     const report = parseCleanPreview("");
     expect(report.categories).toEqual([]);
     expect(report.totalBytes).toBe(0);
+  });
+});
+
+describe("uninstallRunFailed", () => {
+  it("detects mo's interactive-terminal refusal as failure", () => {
+    expect(
+      uninstallRunFailed(
+        "Matched 1 app(s): 1. 腾讯元宝\nUninstall confirmation needs an interactive terminal; no apps were removed.",
+      ),
+    ).toBe(true);
+  });
+  it("detects unreadable confirmation as failure", () => {
+    expect(uninstallRunFailed("Could not read the uninstall confirmation; no apps were removed.")).toBe(true);
+  });
+  it("treats a normal completed run as success", () => {
+    expect(uninstallRunFailed("✓ /Applications/Foo.app removed to Trash")).toBe(false);
   });
 });

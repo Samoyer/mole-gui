@@ -14,6 +14,14 @@ export const moUninstallPreview = (name: string, id: number) =>
   invoke<string>("mo_uninstall_preview", { name, id });
 export const moUninstallRun = (name: string, permanent: boolean, id: number) =>
   invoke<string>("mo_uninstall_run", { name, permanent, id });
+
+// mo 卸载失败时退出码是 0，只能从输出文本判断（如交互确认被拒绝），
+// 匹配到这些标记就不能当成功处理
+export function uninstallRunFailed(text: string): boolean {
+  return /no apps were removed|nothing was changed|needs an interactive terminal|could not read the uninstall confirmation/i.test(
+    text,
+  );
+}
 export const moAnalyze = (path: string | undefined, id: number) =>
   invoke<string>("mo_analyze", { path: path ?? null, id });
 export const moJobCancel = (id: number) => invoke<void>("mo_job_cancel", { id });

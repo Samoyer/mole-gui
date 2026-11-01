@@ -190,6 +190,20 @@ fn spawn_nice(
     cmd.spawn().map_err(|e| format!("无法启动 mo：{e}"))
 }
 
+/// 通过 `script` 分配真 PTY 再跑 mo：mo uninstall 会检查 stdin 是否为
+/// 终端，明确拒绝从管道读取确认（防止无人审查的自动卸载），
+/// 管道喂 "y" 在 mole 1.66 上不起作用。
+fn spawn_nice_pty(mo: &PathBuf, args: &[&str]) -> Result<std::process::Child, String> {
+    let mut cmd = Command::new("/usr/bin/script");
+    cmd.args(["-q", "/dev/null", "/usr/bin/nice", "-n", "10"])
+        .arg(mo)
+        .args(args)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .stdin(std::process::Stdio::piped());
+    cmd.spawn().map_err(|e| format!("无法启动 mo：{e}"))
+}
+
 /// mo clean 按分类渐进输出（"➤ 分类名"），实测 14 个分类头。
 /// 每出现一个标记就给前端发一次真实进度事件；总数以实际看到的
 /// 分类头动态校准（mole 升级增减分类时百分比才不会算错）。
@@ -235,9 +249,14 @@ fn run_mo_heavy(
     id: u64,
     args: &[&str],
     stdin_text: Option<&str>,
+    prompt_response: Option<&str>,
     cancellable: bool,
 ) -> Result<String, String> {
     let mo = find_mo()?;
+    // PTY 应答模式下，stdin 句柄要共享给 stdout 读线程用于喂确认键
+    let mut pty_stdin: Option<
+        std::sync::Arc<Mutex<Option<std::process::ChildStdin>>>,
+    > = None;
 
     // 串行化：已有任务在跑就轮询等待；自己的 id 被取消则直接退出
     loop {
@@ -248,13 +267,24 @@ fn run_mo_heavy(
                 return Err("已取消".to_string());
             }
             if g.child.is_none() {
-                let mut c = spawn_nice(&mo, args, stdin_text.is_some())?;
+                let mut c = if prompt_response.is_some() {
+                    spawn_nice_pty(&mo, args)?
+                } else {
+                    spawn_nice(&mo, args, stdin_text.is_some())?
+                };
                 if let Some(t) = stdin_text {
                     if let Some(mut h) = c.stdin.take() {
                         use std::io::Write;
                         let _ = h.write_all(t.as_bytes());
                     }
                 }
+                pty_stdin = if prompt_response.is_some() {
+                    c.stdin
+                        .take()
+                        .map(|s| std::sync::Arc::new(Mutex::new(Some(s))))
+                } else {
+                    None
+                };
                 g.child = Some((id, c));
                 break;
             }
@@ -282,6 +312,10 @@ fn run_mo_heavy(
     let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
     // stderr 也单独读，避免管道满导致子进程阻塞
     let (etx, erx) = std::sync::mpsc::channel::<Vec<u8>>();
+    // PTY 模式：stdout 出现确认提示后再喂应答键，避免预喂的按键
+    // 被 mo 的 drain_pending_input 当作"待清理输入"冲掉
+    let responder = prompt_response.map(|s| s.to_string());
+    let responder_stdin = pty_stdin;
     if let Some(mut se) = stderr_handle.take() {
         std::thread::spawn(move || {
             let mut buf = [0u8; 16384];
@@ -306,6 +340,8 @@ fn run_mo_heavy(
     }
     std::thread::spawn(move || {
         let mut buf = [0u8; 16384];
+        let mut pending = responder;
+        let mut carry: Vec<u8> = Vec::new();
         loop {
             match stdout_handle.read(&mut buf) {
                 Ok(0) => {
@@ -313,6 +349,23 @@ fn run_mo_heavy(
                     break;
                 }
                 Ok(n) => {
+                    if let (Some(resp), Some(stdin)) = (&pending, &responder_stdin) {
+                        carry.extend_from_slice(&buf[..n]);
+                        if carry.windows(resp.len()).any(|w| w == resp.as_bytes()) {
+                            if let Ok(mut g) = stdin.lock() {
+                                if let Some(h) = g.as_mut() {
+                                    use std::io::Write;
+                                    let _ = h.write_all(resp.as_bytes());
+                                    let _ = h.flush();
+                                }
+                            }
+                            pending = None;
+                            carry.clear();
+                        } else if carry.len() > 256 {
+                            // 只留尾部，防止长输出无限累积
+                            carry.drain(..carry.len() - 256);
+                        }
+                    }
                     if tx.send(buf[..n].to_vec()).is_err() {
                         break;
                     }
@@ -582,24 +635,24 @@ fn mo_status_watch_stop() -> Result<(), String> {
 
 #[tauri::command]
 fn mo_clean_preview(app: AppHandle, id: u64) -> Result<String, String> {
-    run_mo_heavy(app, id, &["clean", "--dry-run"], None, true)
+    run_mo_heavy(app, id, &["clean", "--dry-run"], None, None, true)
 }
 
 #[tauri::command]
 fn mo_clean_run(app: AppHandle, id: u64) -> Result<String, String> {
     // mo 在管道输入（非 TTY）时自动进入非交互模式，不需要显式确认。
     // 前端在用户点击"立即清理"前已通过 ConfirmSheet 二次确认。
-    run_mo_heavy(app, id, &["clean"], None, false)
+    run_mo_heavy(app, id, &["clean"], None, None, false)
 }
 
 #[tauri::command]
 fn mo_uninstall_list(app: AppHandle, id: u64) -> Result<String, String> {
-    run_mo_heavy(app, id, &["uninstall", "--list"], None, true)
+    run_mo_heavy(app, id, &["uninstall", "--list"], None, None, true)
 }
 
 #[tauri::command]
 fn mo_uninstall_preview(app: AppHandle, name: String, id: u64) -> Result<String, String> {
-    run_mo_heavy(app, id, &["uninstall", "--dry-run", &name], None, true)
+    run_mo_heavy(app, id, &["uninstall", "--dry-run", &name], None, None, true)
 }
 
 #[tauri::command]
@@ -609,9 +662,9 @@ fn mo_uninstall_run(app: AppHandle, name: String, permanent: bool, id: u64) -> R
     } else {
         vec!["uninstall", &name]
     };
-    // mo uninstall 不像 mo clean 那样能自动非交互：它明确要求交互式确认。
-    // 必须在 stdin 喂 "y" 才能通过，否则会拒绝执行。
-    run_mo_heavy(app, id, &args, Some("y\n"), false)
+    // mo uninstall 明确要求交互式确认（检查 stdin 是否为终端），
+    // 必须经真 PTY 运行，并在出现确认提示后喂 "y"。
+    run_mo_heavy(app, id, &args, None, Some("y"), false)
 }
 
 #[tauri::command]
@@ -619,9 +672,9 @@ fn mo_analyze(app: AppHandle, path: Option<String>, id: u64) -> Result<String, S
     match path {
         Some(p) if !p.trim().is_empty() => {
             let p = p.trim().to_string();
-            run_mo_heavy(app, id, &["analyze", "--json", &p], None, true)
+            run_mo_heavy(app, id, &["analyze", "--json", &p], None, None, true)
         }
-        _ => run_mo_heavy(app, id, &["analyze", "--json"], None, true),
+        _ => run_mo_heavy(app, id, &["analyze", "--json"], None, None, true),
     }
 }
 
