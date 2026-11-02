@@ -19,13 +19,21 @@ import { getAppsCache, setAppsCache } from "../lib/cache";
 import { navigate } from "../lib/nav";
 import { formatLastUsedZh } from "../i18n/zh-CN";
 import { ConfirmSheet, IconSearch, IconTrash } from "../components";
+import {
+  isMoCompatibilityBlocked,
+  type MoCompatibility,
+} from "../lib/moCompatibility";
 
 type Phase = "loading" | "ready" | "confirm" | "running";
 
 const previewCache = new Map<string, { text: string; at: number }>();
 const PREVIEW_CACHE_TTL = 10 * 60 * 1000;
 
-export default function UninstallView() {
+export default function UninstallView({
+  compatibility,
+}: {
+  compatibility: MoCompatibility | null;
+}) {
   const [apps, setApps] = useState<AppEntry[]>(() => getAppsCache()?.apps ?? []);
   const [phase, setPhase] = useState<Phase>(() => (getAppsCache() ? "ready" : "loading"));
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +56,7 @@ export default function UninstallView() {
   const listId = useRef(0);
   const listInFlight = useRef(false);
   const runIdRef = useRef(0);
+  const blocked = isMoCompatibilityBlocked(compatibility);
 
   useEffect(() => {
     appsRef.current = apps;
@@ -98,6 +107,7 @@ export default function UninstallView() {
   }, []);
 
   const refresh = async () => {
+    if (blocked) return;
     const id = nextJobId();
     runIdRef.current = id;
     listId.current = id;
@@ -129,6 +139,7 @@ export default function UninstallView() {
   }, [apps, query]);
 
   const pick = async (app: AppEntry) => {
+    if (blocked) return;
     setSelected(app);
     setResult("");
     setPreviewError(null);
@@ -159,7 +170,7 @@ export default function UninstallView() {
   };
 
   const run = async () => {
-    if (!selected) return;
+    if (blocked || !selected) return;
     setPhase("running");
     const ran = selected;
     const id = nextJobId();
@@ -194,7 +205,7 @@ export default function UninstallView() {
           <div className="empty-icon"><IconTrash size={26} /></div>
           <div className="empty-title">尚未读取应用列表</div>
           <div className="desc">读取需要几秒钟，之后可搜索并卸载应用</div>
-          <button className="btn primary" onClick={() => { setPhase("ready"); refresh(); }}>读取应用列表</button>
+          <button className="btn primary" onClick={() => { setPhase("ready"); refresh(); }} disabled={blocked}>读取应用列表</button>
         </div>
       </div>
     );
@@ -217,9 +228,10 @@ export default function UninstallView() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 style={{ paddingLeft: 32, width: "100%" }}
+                disabled={blocked}
               />
             </div>
-            <button className="btn ghost sm" onClick={() => refresh()} disabled={listInFlight.current}>刷新</button>
+            <button className="btn ghost sm" onClick={() => refresh()} disabled={blocked || listInFlight.current}>刷新</button>
           </div>
 
           <section className="panel panel-pad" data-drag style={{ maxHeight: "calc(100vh - 200px)", overflowY: "auto" }}>
@@ -356,7 +368,7 @@ export default function UninstallView() {
                 </button>
                 <button
                   className="btn sm"
-                  disabled={phase === "running"}
+                  disabled={blocked || phase === "running"}
                   onClick={() => setPhase("confirm")}
                   style={{ color: "var(--danger)", borderColor: "color-mix(in srgb, var(--danger) 32%, var(--line))" }}
                 >

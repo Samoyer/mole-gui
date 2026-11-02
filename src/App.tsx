@@ -171,9 +171,9 @@ export default function App() {
           )}
           <div className="page-body" key={nav}>
             {nav === "status" && <StatusView />}
-            {nav === "clean" && <CleanView />}
-            {nav === "uninstall" && <UninstallView />}
-            {nav === "analyze" && <AnalyzeView />}
+            {nav === "clean" && <CleanView compatibility={compatibility} />}
+            {nav === "uninstall" && <UninstallView compatibility={compatibility} />}
+            {nav === "analyze" && <AnalyzeView compatibility={compatibility} />}
           </div>
         </main>
       </div>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assessMoCompatibility,
+  isMoCompatibilityBlocked,
   parseMoVersion,
   validateAnalyzePayload,
 } from "../moCompatibility";
@@ -47,6 +48,15 @@ describe("Mole version contract", () => {
       status: "unknown",
       version: null,
     });
+  });
+
+  it("blocks missing, unknown and unsupported contracts", () => {
+    expect(isMoCompatibilityBlocked(null)).toBe(true);
+    expect(isMoCompatibilityBlocked({ status: "missing", version: null })).toBe(true);
+    expect(isMoCompatibilityBlocked({ status: "unknown", version: null })).toBe(true);
+    expect(isMoCompatibilityBlocked({ status: "unsupported", version: "2.0.0" })).toBe(true);
+    expect(isMoCompatibilityBlocked({ status: "untested", version: "1.67.0" })).toBe(false);
+    expect(isMoCompatibilityBlocked({ status: "supported", version: "1.66.0" })).toBe(false);
   });
 });
 

@@ -20,6 +20,10 @@ import {
   readCleanPersist,
   persistClean,
 } from "../lib/cache";
+import {
+  isMoCompatibilityBlocked,
+  type MoCompatibility,
+} from "../lib/moCompatibility";
 
 type InitPhase = "init" | "scanning" | "preview" | "confirm" | "running" | "done";
 
@@ -141,9 +145,17 @@ async function runCleanAction() {
   }
 }
 
-export default function CleanView() {
+export default function CleanView({
+  compatibility,
+}: {
+  compatibility: MoCompatibility | null;
+}) {
   const snap = useSyncExternalStore(subscribeClean, getCleanSnapshot);
   const [focus, setFocus] = useState<string | null>(null);
+  const blocked = isMoCompatibilityBlocked(compatibility);
+  const beginScan = () => {
+    if (!blocked) startScan(true);
+  };
 
   // 任务链入口：其他页面带 focus 参数跳来时，只显示对应分类
   useEffect(() => {
@@ -178,7 +190,7 @@ export default function CleanView() {
     return (
       <div className="error-box">
         {snap.error}
-        <button className="btn ghost sm" style={{ marginLeft: 12 }} onClick={() => startScan(true)}>
+        <button className="btn ghost sm" style={{ marginLeft: 12 }} onClick={beginScan} disabled={blocked}>
           重试
         </button>
       </div>
@@ -190,7 +202,7 @@ export default function CleanView() {
           <div className="empty-icon"><IconSparkle size={26} /></div>
           <div className="empty-title">尚未扫描</div>
           <div className="desc">扫描缓存、日志和临时文件，找出可安全清理的内容</div>
-          <button className="btn primary" onClick={() => startScan(true)}>开始扫描</button>
+          <button className="btn primary" onClick={beginScan} disabled={blocked}>开始扫描</button>
         </div>
       </div>
     );
@@ -242,13 +254,13 @@ export default function CleanView() {
             <button className="btn ghost sm" onClick={() => navigate("analyze", { focus: "large" })}>
               查看大文件
             </button>
-            <button className="btn ghost sm" onClick={() => startScan(true)} disabled={phase !== "preview" || snap.refreshing}>
+            <button className="btn ghost sm" onClick={beginScan} disabled={blocked || phase !== "preview" || snap.refreshing}>
               重新扫描
             </button>
             <button
               className="btn primary sm"
               onClick={() => setClean({ phase: "confirm" })}
-              disabled={phase !== "preview" || snap.refreshing}
+              disabled={blocked || phase !== "preview" || snap.refreshing}
             >
               立即清理
             </button>
@@ -314,7 +326,7 @@ export default function CleanView() {
             <pre className="pre-output" style={{ margin: 0, fontFamily: "ui-monospace, Consolas, monospace", fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{snap.output || "（无输出）"}</pre>
           </section>
           <div style={{ marginTop: 14, display: "flex", gap: 8 }}>
-            <button className="btn primary" onClick={() => startScan(true)}>重新扫描</button>
+            <button className="btn primary" onClick={beginScan} disabled={blocked}>重新扫描</button>
           </div>
         </>
       )}
@@ -331,7 +343,9 @@ export default function CleanView() {
           }
           confirmLabel="清理"
           destructive
-          onConfirm={runCleanAction}
+          onConfirm={() => {
+            if (!blocked) runCleanAction();
+          }}
           onCancel={() => setClean({ phase: "preview" })}
         />
       )}

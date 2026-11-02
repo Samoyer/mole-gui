@@ -21,7 +21,11 @@ import Treemap from "../components/Treemap";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { navigate, consumeNavParams } from "../lib/nav";
 import { translateFolderName } from "../i18n/zh-CN";
-import { validateAnalyzePayload } from "../lib/moCompatibility";
+import {
+  isMoCompatibilityBlocked,
+  validateAnalyzePayload,
+  type MoCompatibility,
+} from "../lib/moCompatibility";
 
 interface Crumb {
   label: string;
@@ -48,7 +52,11 @@ const overviewSession: {
   error: string | null;
 } = { jobId: 0, inFlight: false, startedAt: 0, error: null };
 
-export default function AnalyzeView() {
+export default function AnalyzeView({
+  compatibility,
+}: {
+  compatibility: MoCompatibility | null;
+}) {
   const [data, setData] = useState<AnalyzeData | null>(null);
   const [staleAt, setStaleAt] = useState<number | null>(null);
   const [crumbs, setCrumbs] = useState<Crumb[]>([{ label: "概览", path: null }]);
@@ -62,8 +70,10 @@ export default function AnalyzeView() {
   const jobInFlight = useRef(false);
   const hasContent = useRef(false);
   const scanStartedAt = useRef(0);
+  const blocked = isMoCompatibilityBlocked(compatibility);
 
   const load = useCallback(async (path: string | null, force = false) => {
+    if (blocked) return;
     const key = path ?? analyzeOverviewKey;
     if (!force) {
       const hit = getAnalyzeCached(key);
@@ -143,7 +153,7 @@ export default function AnalyzeView() {
       jobInFlight.current = false;
       if (isOverview) overviewSession.inFlight = false;
     }
-  }, []);
+  }, [blocked]);
 
   useEffect(() => {
     mounted.current = true;
@@ -215,13 +225,13 @@ export default function AnalyzeView() {
   }, [highlightLarge, data]);
 
   const drill = (path: string, label: string) => {
-    if (jobInFlight.current) return;
+    if (blocked || jobInFlight.current) return;
     setCrumbs((c) => [...c, { label, path }]);
     load(path);
   };
 
   const jump = (idx: number) => {
-    if (jobInFlight.current) return;
+    if (blocked || jobInFlight.current) return;
     const target = crumbs[idx];
     setCrumbs(crumbs.slice(0, idx + 1));
     load(target.path);
@@ -290,7 +300,7 @@ export default function AnalyzeView() {
             <button
               className="btn ghost sm"
               onClick={() => load(crumbs[crumbs.length - 1].path, true)}
-              disabled={phase === "scanning" || phase === "refreshing"}
+              disabled={blocked || phase === "scanning" || phase === "refreshing"}
             >
               重新扫描
             </button>
@@ -314,7 +324,7 @@ export default function AnalyzeView() {
           <div className="clean-hero-empty">
             <div className="big">尚未扫描过磁盘</div>
             <div className="desc">扫描需要几十秒，开始后可以逐级查看各目录的占用</div>
-            <button className="btn primary" onClick={() => load(null)}>开始扫描</button>
+            <button className="btn primary" onClick={() => load(null)} disabled={blocked}>开始扫描</button>
           </div>
         </section>
       )}

@@ -69,6 +69,17 @@ export function missingMoCompatibility(): MoCompatibility {
   return { status: "missing", version: null };
 }
 
+export function isMoCompatibilityBlocked(
+  compatibility: MoCompatibility | null | undefined,
+): boolean {
+  return (
+    !compatibility ||
+    compatibility.status === "missing" ||
+    compatibility.status === "unknown" ||
+    compatibility.status === "unsupported"
+  );
+}
+
 /** Validate the stable top-level and entry fields consumed by AnalyzeView. */
 export function validateAnalyzePayload(value: unknown): string[] {
   if (!value || typeof value !== "object") return ["payload"];
