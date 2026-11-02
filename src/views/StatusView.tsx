@@ -257,21 +257,34 @@ export default function StatusView() {
 
         <section className="dash-card" data-drag>
           <div className="dash-title">大文件提醒</div>
-          <div className="dash-main">
-            <span className="stat-num-lg">{bigFiles === null ? "--" : bigFiles}<em> 个</em></span>
-          </div>
-          <div className="dash-sub">
-            {bigFiles === null
-              ? "完成一次磁盘分析后，这里会提醒大文件"
-              : bigFiles > 0
-                ? "发现大于 1GB 的项目，可去磁盘分析确认"
-                : "当前没有大于 1GB 的项目"}
-          </div>
-          <div className="dash-actions">
-            <button className="btn ghost sm" disabled={bigFiles === null} onClick={() => navigate("analyze")}>
-              查看
-            </button>
-          </div>
+          {bigFiles === null ? (
+            <>
+              <div className="dash-main"><span className="stat-num-lg">--</span></div>
+              <div className="dash-sub">完成一次磁盘分析后，这里会提醒大文件</div>
+              <div className="dash-actions">
+                <button className="btn ghost sm" disabled onClick={() => navigate("analyze")}>查看</button>
+              </div>
+            </>
+          ) : bigFiles > 0 ? (
+            <>
+              <div className="dash-main">
+                <span className="stat-num-lg">{bigFiles}<em> 个</em></span>
+              </div>
+              <div className="dash-sub">发现大于 1GB 的项目，可去磁盘分析确认</div>
+              <div className="dash-actions">
+                <button className="btn ghost sm" onClick={() => navigate("analyze")}>查看</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="dash-sub" style={{ fontSize: 14, lineHeight: 1.7 }}>
+                磁盘状况良好，未发现大文件
+              </div>
+              <div className="dash-actions">
+                <button className="btn ghost sm" onClick={() => navigate("analyze")}>查看</button>
+              </div>
+            </>
+          )}
         </section>
       </div>
 
@@ -294,7 +307,7 @@ export default function StatusView() {
             <div className="panel stat-tile">
               <span className="stat-label">磁盘读写</span>
               <b className="stat-num-md">{formatRate(data.disk_io.read_rate)}</b>
-              <small className="stat-label">写入 {formatRate(data.disk_io.write_rate)} · {live ? "每 2 秒自动刷新" : "正在连接实时数据…"}</small>
+              <small className="stat-label">写入 {formatRate(data.disk_io.write_rate)} · {live ? "实时更新" : "正在连接实时数据…"}</small>
             </div>
           </div>
 

@@ -11,6 +11,8 @@ import {
   parseJson,
   type AppEntry,
   parseUninstallPreview,
+  formatBytes,
+  parseSizeToBytes,
   type UninstallPreview,
 } from "../lib/mole";
 import { getAppsCache, setAppsCache } from "../lib/cache";
@@ -210,7 +212,7 @@ export default function UninstallView() {
               </span>
               <input
                 className="input"
-                placeholder="搜索应用名称、路径…"
+                placeholder="搜索应用名称"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 style={{ paddingLeft: 32, width: "100%" }}
@@ -242,7 +244,6 @@ export default function UninstallView() {
                     <div className="name">{app.name}</div>
                     <div className="ios-row-sub">{app.size || "大小未知"}</div>
                   </div>
-                  <span className={`pill ${app.source === "App Store" ? "info" : app.source === "拖拽" ? "warn" : "idle"}`}>{app.source}</span>
                 </div>
               ))}
             </div>
@@ -294,10 +295,10 @@ export default function UninstallView() {
                     {(() => {
                       const support = preview.files.filter((f) => !f.path.endsWith(".app"));
                       if (support.length === 0) return null;
-                      const sizes = support.map((f) => f.size).filter(Boolean) as string[];
+                      const totalBytes = support.reduce((sum, f) => sum + (f.size ? parseSizeToBytes(f.size) ?? 0 : 0), 0);
                       return (
                         <>
-                          {" "}及支持文件（{support.length} 处{sizes.length > 0 ? `，约 ${sizes.join(" + ")}` : ""}）
+                          {" "}及支持文件（{support.length} 处{totalBytes > 0 ? `，${formatBytes(totalBytes)}` : ""}）
                         </>
                       );
                     })()}
@@ -308,26 +309,12 @@ export default function UninstallView() {
                   </div>
                   {preview.kept.length > 0 && (
                     <div className="nl-section">
-                      你的项目、录音等个人数据将保留
-                      <div style={{ marginTop: 4 }}>
-                        {preview.kept.slice(0, 8).map((k) => (
-                          <div key={k} className="path-mono" data-break="path" title={k} style={{ maxWidth: 420 }}>
-                            {k}
-                          </div>
-                        ))}
-                      </div>
+                      你的项目、录音等个人数据将保留（{preview.kept.length} 处，详见技术详情）
                     </div>
                   )}
                   {preview.reviewOnly.length > 0 && (
                     <div className="nl-section">
-                      以下内容仅审查，不会删除：
-                      <div style={{ marginTop: 4 }}>
-                        {preview.reviewOnly.slice(0, 6).map((k) => (
-                          <div key={k} className="path-mono" data-break="path" title={k} style={{ maxWidth: 420 }}>
-                            {k}
-                          </div>
-                        ))}
-                      </div>
+                      以下 {preview.reviewOnly.length} 处内容仅审查，不会删除（详见技术详情）
                     </div>
                   )}
                   <details className="tech-details">

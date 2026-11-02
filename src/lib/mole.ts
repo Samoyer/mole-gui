@@ -157,6 +157,14 @@ export function formatRate(mbs: number): string {
   return `${(mbs * 1024).toFixed(0)} KB/s`;
 }
 
+// "156.6MB" → 字节数；解析失败返回 null
+export function parseSizeToBytes(text: string): number | null {
+  const m = text.match(/([\d.]+)\s*(B|KB|MB|GB|TB)\b/i);
+  if (!m) return null;
+  const idx = UNITS.findIndex((u) => u.toLowerCase() === m[2].toLowerCase());
+  return parseFloat(m[1]) * Math.pow(1024, idx < 0 ? 0 : idx);
+}
+
 export function parseJson<T>(raw: string): T {
   return JSON.parse(raw) as T;
 }
@@ -194,6 +202,16 @@ export function parseUninstallPreview(text: string, appName: string): UninstallP
       if (size) preview.appSize = `${size[1]}${size[2].toUpperCase()}`;
       const last = trimmed.match(/Last:\s*\S+\s+ago/i);
       preview.lastUsedRaw = last ? last[0] : null;
+      continue;
+    }
+    // 应用名单独一行："1. Keynote 演讲  549.8MB  |  Last: 1y ago"
+    const numbered = trimmed.match(
+      /^\d+\.\s+(.+?)\s{2,}([\d.]+\s*(?:B|KB|MB|GB|TB))\b(?:\s*\|\s*(Last:[^|]*ago))?/i,
+    );
+    if (numbered) {
+      preview.appName = numbered[1].trim();
+      preview.appSize = numbered[2].replace(/\s+/g, "").toUpperCase();
+      if (numbered[3]) preview.lastUsedRaw = numbered[3].trim();
       continue;
     }
     if (/^Files to be removed/i.test(trimmed)) {

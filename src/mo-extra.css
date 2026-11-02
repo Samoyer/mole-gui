@@ -145,7 +145,7 @@ dialog.confirm-sheet .sheet-actions { display: flex; justify-content: flex-end; 
 /* ---------- 代码/预格式化输出 ---------- */
 .pre-output {
   font-family: ui-monospace, Consolas, monospace; font-size: 12px; line-height: 1.6;
-  white-space: pre-wrap; word-break: break-all; color: var(--text-2);
+  white-space: pre-wrap; word-break: normal; overflow-wrap: break-word; color: var(--text-2);
   background: color-mix(in srgb, var(--text) 4%, transparent);
   padding: 12px; border-radius: calc(12px * var(--corner-scale, 1));
   overflow: auto;
@@ -384,8 +384,8 @@ html[data-theme="dark"] .pill.warn { color: #ffb340; }
 
 /* 悬停提示（部分结果 / 接口名等） */
 .tip {
-  text-decoration: underline dotted color-mix(in srgb, var(--label-color) 70%, transparent);
-  text-underline-offset: 3px;
+  /* 仅提供悬停说明，不做链接样式（不可点击文本不得有下划线） */
+  text-decoration: none;
   cursor: help;
 }
 

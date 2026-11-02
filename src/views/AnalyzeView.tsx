@@ -20,6 +20,7 @@ import { IconFile, IconFolder, IconReveal, ScanProgress } from "../components";
 import Treemap from "../components/Treemap";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { navigate, consumeNavParams } from "../lib/nav";
+import { translateFolderName } from "../i18n/zh-CN";
 
 interface Crumb {
   label: string;
@@ -324,7 +325,7 @@ export default function AnalyzeView() {
               </div>
               <Treemap
                 items={entries.map((e) => ({
-                  name: e.name,
+                  name: translateFolderName(e.name),
                   path: e.path,
                   size: e.size,
                   isDir: e.is_dir,
@@ -392,7 +393,7 @@ export default function AnalyzeView() {
                     {e.is_dir ? <IconFolder size={15} /> : <IconFile size={15} />}
                   </span>
                   <div className="grow">
-                    <div className="name">{e.name}</div>
+                    <div className="name" title={e.path}>{translateFolderName(e.name)}</div>
                   </div>
                   <div className="row-right">
                     <span className="num">{formatBytes(e.size)}</span>
