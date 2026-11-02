@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light" data-material="clear" data-color="blue" data-corner="default">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>Mole GUI 界面示例</title>
+    <link rel="stylesheet" href="../src/sunny-preview.css" />
+    <link rel="stylesheet" href="../src/liquid-glass.css" />
+    <link rel="stylesheet" href="../src/mo-extra.css" />
+    <link rel="stylesheet" href="../src/apple-hig.css" />
+    <style>
+      html,
+      body {
+        overflow: hidden;
+      }
+
+      .app,
+      .workspace {
+        height: 100vh;
+        min-height: 0;
+      }
+
+      .workspace {
+        overflow: hidden;
+      }
+
+      .content {
+        height: calc(100vh - 52px);
+        overflow: auto;
+      }
+
+      .demo-view {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .demo-view[hidden] {
+        display: none !important;
+      }
+
+      .window-controls {
+        position: fixed;
+        top: 16px;
+        left: 17px;
+        z-index: 100;
+        display: flex;
+        gap: 8px;
+      }
+
+      .window-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18);
+      }
+
+      .window-dot.close {
+        background: #ff5f57;
+      }
+
+      .window-dot.minimize {
+        background: #febc2e;
+      }
+
+      .window-dot.zoom {
+        background: #28c840;
+      }
+
+      .demo-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        height: 26px;
+        padding: 0 10px;
+        border-radius: 999px;
+        background: rgba(0, 0, 0, 0.045);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 560;
+      }
+
+      .demo-chip::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+      }
+
+      .demo-card {
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .demo-app-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 9px;
+        display: grid;
+        place-items: center;
+        flex: none;
+        color: #fff;
+        font-size: 15px;
+        font-weight: 650;
+        box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.35);
+      }
+
+      .demo-app-icon.blue {
+        background: linear-gradient(145deg, #6eb5ff, #1677ff);
+      }
+
+      .demo-app-icon.teal {
+        background: linear-gradient(145deg, #70d7d1, #16a39c);
+      }
+
+      .demo-app-icon.orange {
+        background: linear-gradient(145deg, #ffca76, #ff8a1f);
+      }
+
+      .demo-app-icon.slate {
+        background: linear-gradient(145deg, #9aa8b8, #5f7085);
+      }
+
+      .demo-app-icon.rose {
+        background: linear-gradient(145deg, #ff9bb2, #e74b72);
+      }
+
+      .demo-app-icon.indigo {
+        background: linear-gradient(145deg, #a9b7ff, #5b6de8);
+      }
+
+      .demo-uninstall .panel {
+        min-height: 642px;
+      }
+
+      .demo-uninstall-list {
+        max-height: 642px;
+        overflow: hidden;
+      }
+
+      .demo-uninstall-detail {
+        min-height: 642px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .demo-detail-main {
+        flex: 1;
+      }
+
+      .demo-detail-footer {
+        margin-top: auto;
+        padding-top: 14px;
+      }
+
+      .demo-check {
+        width: 15px;
+        height: 15px;
+        accent-color: var(--accent);
+      }
+
+      .demo-search {
+        position: relative;
+        flex: 1;
+      }
+
+      .demo-search .ic {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        width: 13px;
+        height: 13px;
+        color: var(--muted);
+        transform: translateY(-50%);
+      }
+
+      .demo-search .input {
+        width: 100%;
+        padding-left: 32px;
+      }
+
+      .demo-inline-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 10px 2px 0;
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+
+      .demo-treemap {
+        padding: 12px;
+      }
+
+      .demo-treemap svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .demo-treemap text {
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .demo-analyze-list .mrow {
+        min-height: 40px;
+      }
+
+      .demo-analyze-list .grow {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .demo-folder {
+        width: 16px;
+        height: 16px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        flex: none;
+        color: var(--accent);
+      }
+
+      .demo-status .dash-card {
+        min-height: 158px;
+      }
+
+      .demo-status .pro-mode {
+        margin-top: 2px;
+      }
+
+      .demo-clean-row {
+        min-height: 45px;
+      }
+
+      .demo-clean-row .name {
+        white-space: nowrap;
+      }
+
+      .demo-clean-row .num {
+        min-width: 72px;
+        text-align: right;
+      }
+
+      .demo-note {
+        font-size: 11.5px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" aria-hidden="true" style="position: absolute">
+      <defs>
+        <symbol id="i-gauge" viewBox="0 0 24 24">
+          <path d="M12 20a8 8 0 1 1 8-8" />
+          <path d="M12 12l4.2-3.4" />
+          <path d="M20 15.5a8 8 0 0 1-1.6 2.9" />
+        </symbol>
+        <symbol id="i-sparkle" viewBox="0 0 24 24">
+          <path d="M11 4l1.7 4.6L17.5 10l-4.8 1.4L11 16l-1.7-4.6L4.5 10l4.8-1.4L11 4z" />
+          <path d="M18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2z" />
+        </symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24">
+          <path d="M5 7h14" />
+          <path d="M9.5 7V5.4c0-.8.7-1.4 1.5-1.4h2c.8 0 1.5.6 1.5 1.4V7" />
+          <path d="M6.5 7l.8 12c.05.9.8 1.6 1.7 1.6h5.9c.9 0 1.65-.7 1.7-1.6l.8-12" />
+          <path d="M10 11.5v5.5M14 11.5v5.5" />
+        </symbol>
+        <symbol id="i-disk" viewBox="0 0 24 24">
+          <ellipse cx="12" cy="6.5" rx="7.5" ry="3" />
+          <path d="M4.5 6.5v11c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-11" />
+          <path d="M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3" />
+        </symbol>
+        <symbol id="i-search" viewBox="0 0 24 24">
+          <circle cx="10.5" cy="10.5" r="6.2" />
+          <path d="M15.3 15.3L20 20" />
+        </symbol>
+        <symbol id="i-folder" viewBox="0 0 24 24">
+          <path d="M4 7c0-1.1.9-2 2-2h3.6c.6 0 1.1.3 1.5.7l.9 1c.4.5.9.7 1.5.7H18c1.1 0 2 .9 2 2v8c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2V7z" />
+        </symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24">
+          <path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z" />
+          <circle cx="12" cy="12" r="2.8" />
+        </symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24">
+          <path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.6 8.6 0 1 0 11.2 11.2z" />
+        </symbol>
+      </defs>
+    </svg>
+
+    <div class="window-controls" aria-hidden="true">
+      <span class="window-dot close"></span>
+      <span class="window-dot minimize"></span>
+      <span class="window-dot zoom"></span>
+    </div>
+
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">
+            <img class="brand-logo" src="../src/assets/mole-logo.png" alt="" />
+          </div>
+          <div class="brand-text">
+            <strong>Mole</strong>
+            <small>Mac 工具箱</small>
+          </div>
+        </div>
+
+        <nav class="nav">
+          <div class="nav-label">工具</div>
+          <button class="nav-item" data-nav="status">
+            <span class="ic"><svg class="ic"><use href="#i-gauge"></use></svg></span>
+            <strong>状态总览</strong>
+          </button>
+          <button class="nav-item" data-nav="clean">
+            <span class="ic"><svg class="ic"><use href="#i-sparkle"></use></svg></span>
+            <strong>深度清理</strong>
+          </button>
+          <button class="nav-item" data-nav="uninstall">
+            <span class="ic"><svg class="ic"><use href="#i-trash"></use></svg></span>
+            <strong>应用卸载</strong>
+          </button>
+          <button class="nav-item" data-nav="analyze">
+            <span class="ic"><svg class="ic"><use href="#i-disk"></use></svg></span>
+            <strong>磁盘分析</strong>
+          </button>
+        </nav>
+
+        <div class="sidebar-spacer"></div>
+        <div class="side-foot">
+          <button class="icon-btn theme-toggle" title="外观跟随系统">
+            <svg class="ic"><use href="#i-moon"></use></svg>
+          </button>
+          <div class="version">Mole v1.66.x</div>
+        </div>
+      </aside>
+
+      <div class="workspace">
+        <header class="topbar">
+          <div class="crumb">
+            <strong id="page-title">状态总览</strong>
+          </div>
+          <div class="top-actions">
+            <span class="demo-chip">界面示例 · 示例数据</span>
+          </div>
+        </header>
+
+        <main class="content">
+          <section class="demo-view demo-status" data-view="status">
+            <div class="dash-grid">
+              <section class="dash-card">
+                <div class="dash-title">存储健康</div>
+                <div class="dash-main">
+                  <span class="stat-num-lg">64<em>%</em></span>
+                  <span class="stat-label">Macintosh HD 已使用</span>
+                </div>
+                <div class="progress-track"><i style="width: 64%"></i></div>
+                <div class="dash-sub">
+                  <span class="health-dot good"></span>
+                  磁盘状况：良好 · 剩余 178.6 GB
+                </div>
+                <div class="dash-sub">外置磁盘 · 已用 412 GB / 1 TB</div>
+              </section>
+
+              <section class="dash-card">
+                <div class="dash-title">可清理空间</div>
+                <div class="dash-main">
+                  <span class="stat-num-lg num-key">18.4 GB</span>
+                </div>
+                <div class="dash-sub">来自上次深度清理扫描的预估</div>
+                <div class="dash-actions">
+                  <button class="btn primary sm">去清理</button>
+                </div>
+              </section>
+
+              <section class="dash-card">
+                <div class="dash-title">大文件提醒</div>
+                <div class="dash-main">
+                  <span class="stat-num-lg">3<em> 个</em></span>
+                </div>
+                <div class="dash-sub">发现大于 1GB 的项目，可去磁盘分析确认</div>
+                <div class="dash-actions">
+                  <button class="btn ghost sm">查看</button>
+                </div>
+              </section>
+            </div>
+
+            <details class="pro-mode">
+              <summary>专业模式（实时指标、存储、网络、进程）</summary>
+            </details>
+          </section>
+
+          <section class="demo-view" data-view="clean" hidden>
+            <section class="panel clean-hero">
+              <div>
+                <div class="big">8.6 GB</div>
+                <div class="desc">已选 6 个清理目标 · 8.6 GB · 当前剩余 178.6 GB · 扫描于 14:32</div>
+              </div>
+              <div class="hero-actions">
+                <button class="btn ghost sm">查看大文件</button>
+                <button class="btn ghost sm">取消全选</button>
+                <button class="btn ghost sm">重新扫描</button>
+                <button class="btn primary sm">清理已选</button>
+              </div>
+            </section>
+
+            <div>
+              <div class="clean-group-head">
+                <label class="clean-group-label">
+                  <input class="selection-checkbox" type="checkbox" checked />
+                  <span>各应用缓存</span>
+                </label>
+                <span class="hint">已选 3/3</span>
+              </div>
+              <section class="panel clean-target-panel">
+                <div class="row-list">
+                  <label class="mrow clean-target-row demo-clean-row picked">
+                    <input class="selection-checkbox" type="checkbox" checked />
+                    <div class="grow">
+                      <div class="name">示例应用缓存</div>
+                      <div class="sub">包含 24 个项目</div>
+                    </div>
+                    <span class="num">3.4 GB</span>
+                  </label>
+                  <label class="mrow clean-target-row demo-clean-row picked">
+                    <input class="selection-checkbox" type="checkbox" checked />
+                    <div class="grow">
+                      <div class="name">浏览器缓存</div>
+                      <div class="sub">包含 16 个项目</div>
+                    </div>
+                    <span class="num">2.1 GB</span>
+                  </label>
+                  <label class="mrow clean-target-row demo-clean-row picked">
+                    <input class="selection-checkbox" type="checkbox" checked />
+                    <div class="grow">
+                      <div class="name">开发工具缓存</div>
+                      <div class="sub">包含 8 个细分目标</div>
+                    </div>
+                    <span class="num">1.8 GB</span>
+                  </label>
+                </div>
+              </section>
+            </div>
+
+            <div>
+              <div class="clean-group-head">
+                <label class="clean-group-label">
+                  <input class="selection-checkbox" type="checkbox" checked />
+                  <span>系统与临时文件</span>
+                </label>
+                <span class="hint">已选 3/3</span>
+              </div>
+              <section class="panel clean-target-panel">
+                <div class="row-list">
+                  <label class="mrow clean-target-row demo-clean-row picked">
+                    <input class="selection-checkbox" type="checkbox" checked />
+                    <div class="grow">
+                      <div class="name">应用日志</div>
+                      <div class="sub">包含 31 个项目</div>
+                    </div>
+                    <span class="num">620 MB</span>
+                  </label>
+                  <label class="mrow clean-target-row demo-clean-row picked">
+                    <input class="selection-checkbox" type="checkbox" checked />
+                    <div class="grow">
+                      <div class="name">媒体分析临时文件</div>
+                      <div class="sub">缓存目标</div>
+                    </div>
+                    <span class="num">480 MB</span>
+                  </label>
+                  <label class="mrow clean-target-row demo-clean-row picked">
+                    <input class="selection-checkbox" type="checkbox" checked />
+                    <div class="grow">
+                      <div class="name">系统帮助缓存</div>
+                      <div class="sub">缓存目标</div>
+                    </div>
+                    <span class="num">210 MB</span>
+                  </label>
+                </div>
+              </section>
+            </div>
+
+            <div>
+              <div class="clean-group-head">
+                <span class="clean-group-label">未能预览的项目</span>
+              </div>
+              <section class="panel panel-pad">
+                <div class="row-list">
+                  <div class="mrow">
+                    <span class="clean-skip-mark">◎</span>
+                    <div class="grow">
+                      <div class="name">废纸篓</div>
+                      <div class="skip-reason">
+                        需要完全磁盘访问权限才能预览这项内容。
+                        <button class="inline-link-btn">去授权</button>
+                      </div>
+                    </div>
+                    <span class="pill warn">已跳过</span>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <section class="demo-view demo-uninstall" data-view="uninstall" hidden>
+            <div class="split-view">
+              <div style="min-width: 0">
+                <div style="display: flex; gap: 8px; margin-bottom: 12px">
+                  <div class="demo-search">
+                    <svg class="ic"><use href="#i-search"></use></svg>
+                    <input class="input" placeholder="搜索应用名称" />
+                  </div>
+                  <button class="btn ghost sm">刷新</button>
+                </div>
+
+                <section class="panel panel-pad demo-uninstall-list">
+                  <div class="row-list">
+                    <div class="mrow clickable selected">
+                      <span class="demo-app-icon blue">记</span>
+                      <div class="grow">
+                        <div class="name">示例笔记</div>
+                        <div class="ios-row-sub">248 MB</div>
+                      </div>
+                    </div>
+                    <div class="mrow clickable">
+                      <span class="demo-app-icon teal">览</span>
+                      <div class="grow">
+                        <div class="name">示例浏览器</div>
+                        <div class="ios-row-sub">386 MB</div>
+                      </div>
+                    </div>
+                    <div class="mrow clickable">
+                      <span class="demo-app-icon orange">设</span>
+                      <div class="grow">
+                        <div class="name">示例设计工具</div>
+                        <div class="ios-row-sub">1.2 GB</div>
+                      </div>
+                    </div>
+                    <div class="mrow clickable">
+                      <span class="demo-app-icon rose">影</span>
+                      <div class="grow">
+                        <div class="name">示例影音</div>
+                        <div class="ios-row-sub">640 MB</div>
+                      </div>
+                    </div>
+                    <div class="mrow clickable">
+                      <span class="demo-app-icon slate">压</span>
+                      <div class="grow">
+                        <div class="name">示例压缩工具</div>
+                        <div class="ios-row-sub">78 MB</div>
+                      </div>
+                    </div>
+                    <div class="mrow clickable">
+                      <span class="demo-app-icon indigo">阅</span>
+                      <div class="grow">
+                        <div class="name">示例阅读器</div>
+                        <div class="ios-row-sub">156 MB</div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+                <div class="demo-inline-meta">
+                  <span>共 6 个示例应用</span>
+                  <span>列表仅用于界面展示</span>
+                </div>
+              </div>
+
+              <section class="panel panel-pad demo-uninstall-detail">
+                <div class="demo-detail-main">
+                  <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px">
+                    <span class="demo-app-icon blue" style="width: 52px; height: 52px; border-radius: 13px; font-size: 21px">记</span>
+                    <div>
+                      <div style="font-size: 17px; font-weight: 700; letter-spacing: -0.015em">示例笔记</div>
+                      <div style="margin-top: 4px">
+                        <span class="pill idle">示例应用</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="path-mono" style="margin-bottom: 16px">/Applications/示例笔记.app</div>
+                  <div style="font-size: 12px; color: var(--muted); margin-bottom: 6px">卸载预览</div>
+
+                  <div class="uninst-nl">
+                    <div class="nl-section">预览模式：不会删除任何文件</div>
+                    <div class="nl-section">将移除 <b>示例笔记</b> 本体（248 MB）及支持文件（36 MB）</div>
+                    <div class="nl-section">你的项目、录音等个人数据将保留（2 处，详见技术详情）</div>
+                    <details class="tech-details">
+                      <summary>技术详情（原始输出）</summary>
+                    </details>
+                  </div>
+
+                  <label style="display: flex; align-items: center; gap: 7px; margin: 18px 0; font-size: 12.5px; color: var(--text-2)">
+                    <input class="demo-check" type="checkbox" />
+                    彻底删除（跳过废纸篓，不可恢复）
+                  </label>
+                </div>
+
+                <div class="demo-detail-footer" style="display: flex; gap: 8px; justify-content: flex-end">
+                  <button class="btn ghost sm">取消</button>
+                  <button class="btn sm" style="color: var(--danger); border-color: color-mix(in srgb, var(--danger) 32%, var(--line))">移到废纸篓</button>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <section class="demo-view" data-view="analyze" hidden>
+            <section class="panel clean-hero">
+              <div>
+                <div class="big">342.8 GB</div>
+                <div class="desc">磁盘占用 · 扫描完成</div>
+              </div>
+              <div class="hero-actions">
+                <button class="btn ghost sm">去清理缓存</button>
+                <button class="btn ghost sm">重新扫描</button>
+              </div>
+            </section>
+
+            <div>
+              <div class="section-title">
+                <span>空间分布</span>
+                <span class="hint">方块大小代表占用 · 点击文件夹下钻</span>
+              </div>
+              <section class="panel demo-treemap" style="margin-top: 12px">
+                <div class="treemap-wrap">
+                  <svg viewBox="0 0 1000 230" role="img" aria-label="示例磁盘空间分布图">
+                    <g>
+                      <rect x="1" y="1" width="296" height="228" rx="5" class="tm-0"></rect>
+                      <text x="15" y="24" fill="#fff" font-size="13" font-weight="650">应用程序</text>
+                      <text x="15" y="43" fill="rgba(255,255,255,.82)" font-size="11">96.2 GB</text>
+                    </g>
+                    <g>
+                      <rect x="299" y="1" width="330" height="145" rx="5" class="tm-1"></rect>
+                      <text x="313" y="24" fill="#fff" font-size="13" font-weight="650">用户资源库</text>
+                      <text x="313" y="43" fill="rgba(255,255,255,.82)" font-size="11">78.4 GB</text>
+                    </g>
+                    <g>
+                      <rect x="631" y="1" width="368" height="94" rx="5" class="tm-2"></rect>
+                      <text x="645" y="24" fill="#fff" font-size="13" font-weight="650">文档</text>
+                      <text x="645" y="43" fill="rgba(255,255,255,.82)" font-size="11">62.7 GB</text>
+                    </g>
+                    <g>
+                      <rect x="299" y="148" width="330" height="81" rx="5" class="tm-3"></rect>
+                      <text x="313" y="171" fill="#fff" font-size="13" font-weight="650">下载</text>
+                      <text x="313" y="190" fill="rgba(255,255,255,.82)" font-size="11">44.1 GB</text>
+                    </g>
+                    <g>
+                      <rect x="631" y="97" width="368" height="132" rx="5" class="tm-4"></rect>
+                      <text x="645" y="121" fill="#fff" font-size="13" font-weight="650">桌面</text>
+                      <text x="645" y="140" fill="rgba(255,255,255,.82)" font-size="11">35.3 GB</text>
+                    </g>
+                  </svg>
+                </div>
+              </section>
+            </div>
+
+            <div>
+              <div class="section-title">
+                <span>存储占用概览</span>
+                <span class="hint">5 项 · 点击文件夹可深入</span>
+              </div>
+              <section class="panel panel-pad demo-analyze-list" style="margin-top: 12px">
+                <div class="row-list">
+                  <div class="mrow clickable">
+                    <div class="grow">
+                      <svg class="demo-folder"><use href="#i-folder"></use></svg>
+                      <div class="name">应用程序</div>
+                    </div>
+                    <div class="row-right">
+                      <span class="num">96.2 GB</span>
+                      <button class="icon-btn" title="在访达中显示"><svg class="ic" style="width: 14px; height: 14px"><use href="#i-eye"></use></svg></button>
+                      <span></span>
+                    </div>
+                  </div>
+                  <div class="mrow clickable">
+                    <div class="grow">
+                      <svg class="demo-folder"><use href="#i-folder"></use></svg>
+                      <div class="name">用户资源库</div>
+                    </div>
+                    <div class="row-right">
+                      <span class="num">78.4 GB</span>
+                      <button class="icon-btn" title="在访达中显示"><svg class="ic" style="width: 14px; height: 14px"><use href="#i-eye"></use></svg></button>
+                      <span></span>
+                    </div>
+                  </div>
+                  <div class="mrow clickable">
+                    <div class="grow">
+                      <svg class="demo-folder"><use href="#i-folder"></use></svg>
+                      <div class="name">文档</div>
+                    </div>
+                    <div class="row-right">
+                      <span class="num">62.7 GB</span>
+                      <button class="icon-btn" title="在访达中显示"><svg class="ic" style="width: 14px; height: 14px"><use href="#i-eye"></use></svg></button>
+                      <span></span>
+                    </div>
+                  </div>
+                  <div class="mrow clickable">
+                    <div class="grow">
+                      <svg class="demo-folder"><use href="#i-folder"></use></svg>
+                      <div class="name">下载</div>
+                    </div>
+                    <div class="row-right">
+                      <span class="num">44.1 GB</span>
+                      <button class="icon-btn" title="在访达中显示"><svg class="ic" style="width: 14px; height: 14px"><use href="#i-eye"></use></svg></button>
+                      <span></span>
+                    </div>
+                  </div>
+                  <div class="mrow clickable">
+                    <div class="grow">
+                      <svg class="demo-folder"><use href="#i-folder"></use></svg>
+                      <div class="name">桌面</div>
+                    </div>
+                    <div class="row-right">
+                      <span class="num">35.3 GB</span>
+                      <button class="icon-btn" title="在访达中显示"><svg class="ic" style="width: 14px; height: 14px"><use href="#i-eye"></use></svg></button>
+                      <span></span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      const titles = {
+        status: "状态总览",
+        clean: "深度清理",
+        uninstall: "应用卸载",
+        analyze: "磁盘分析",
+      };
+      const requested = new URLSearchParams(window.location.search).get("view");
+      const view = Object.prototype.hasOwnProperty.call(titles, requested) ? requested : "status";
+
+      document.querySelectorAll("[data-view]").forEach((node) => {
+        node.hidden = node.dataset.view !== view;
+      });
+      document.querySelectorAll("[data-nav]").forEach((node) => {
+        node.classList.toggle("active", node.dataset.nav === view);
+      });
+      document.getElementById("page-title").textContent = titles[view];
+      document.title = `${titles[view]} · Mole GUI 界面示例`;
+    </script>
+  </body>
+</html>

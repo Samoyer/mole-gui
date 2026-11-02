@@ -16,6 +16,18 @@
 - 本仓库遵循与上游 Mole 一致的 **GNU GPL v3.0**，完整条款见 [LICENSE](LICENSE)。
 - 如需使用，请从源码自行构建；仓库不提供预编译应用或 GitHub Release 安装包。
 
+## 界面示例
+
+> 以下截图均由 [合成示例页面](docs/showcase.html) 生成。示例数据不包含用户的真实文件、应用列表、目录路径或扫描结果。
+
+| 状态总览 | 深度清理 |
+| --- | --- |
+| ![状态总览示例](docs/screenshots/status.png) | ![深度清理示例](docs/screenshots/clean.png) |
+
+| 应用卸载 | 磁盘分析 |
+| --- | --- |
+| ![应用卸载示例](docs/screenshots/uninstall.png) | ![磁盘分析示例](docs/screenshots/analyze.png) |
+
 ## 兼容性
 
 - 已验证：Mole `1.66.x`
