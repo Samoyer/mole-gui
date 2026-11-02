@@ -18,6 +18,7 @@ import { ConfirmSheet, ScanProgress, IconSparkle } from "../components";
 import { navigate, consumeNavParams } from "../lib/nav";
 import {
   cleanTargetLabel,
+  describeCleanSkip,
   translateCategory,
   translateItemName,
 } from "../i18n/zh-CN";
@@ -264,6 +265,7 @@ export default function CleanView({
   const snap = useSyncExternalStore(subscribeClean, getCleanSnapshot);
   const [focus, setFocus] = useState<string | null>(null);
   const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [awaitingPermissionReturn, setAwaitingPermissionReturn] = useState(false);
   const blocked = isMoCompatibilityBlocked(compatibility);
   const beginScan = () => {
     if (!blocked) startScan(true);
@@ -272,6 +274,7 @@ export default function CleanView({
     setPermissionError(null);
     try {
       await openUrl(FULL_DISK_ACCESS_URL);
+      setAwaitingPermissionReturn(true);
     } catch (error) {
       console.error("[opener] failed to open Full Disk Access settings", error);
       setPermissionError(
@@ -287,6 +290,24 @@ export default function CleanView({
       setFocus(params.focus);
     }
   }, []);
+
+  // 从“完全磁盘访问”设置返回后自动重扫一次，避免授权已经生效但界面还拿旧缓存。
+  useEffect(() => {
+    if (!awaitingPermissionReturn) return;
+    let timer = 0;
+    const handleFocus = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        setAwaitingPermissionReturn(false);
+        if (!blocked) startScan(true);
+      }, 500);
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [awaitingPermissionReturn, blocked]);
 
   useEffect(() => {
     if (cacheInitialized) return;
@@ -379,7 +400,14 @@ export default function CleanView({
   const skippedItems = visibleCategories.flatMap((category) =>
     category.items
       .filter((item) => item.mark === "skip")
-      .map((item) => ({ category: category.name, item })),
+      .map((item) => ({
+        category: category.name,
+        item,
+        skip: describeCleanSkip(item.name),
+        title:
+          translateItemName(item.name) ||
+          (/^trash\b/i.test(item.name) ? "废纸篓" : "未能预览的项目"),
+      })),
   );
 
   const setSelection = (paths: string[]) => {
@@ -470,6 +498,12 @@ export default function CleanView({
         </section>
       )}
 
+      {report.sudoNote && (phase === "preview" || phase === "confirm") && (
+        <div className="notice-box">
+          完全磁盘访问用于读取废纸篓等受保护数据；系统级缓存仍需要管理员密码（sudo），本次预览只包含当前用户可读取的内容。
+        </div>
+      )}
+
       {targets.length === 0 && (phase === "preview" || phase === "confirm") && (
         <div className="notice-box">
           当前结果来自旧版缓存。请重新扫描一次，才能按项目勾选并只清理所选内容。
@@ -546,23 +580,25 @@ export default function CleanView({
           </div>
           <section className="panel panel-pad">
             <div className="row-list">
-              {skippedItems.map(({ category, item }, index) => (
+              {skippedItems.map(({ category, item, skip, title }, index) => (
                 <div className="mrow" key={`${category}-${item.name}-${index}`}>
                   <span className="clean-skip-mark">{MARK_TEXT.skip}</span>
                   <div className="grow">
-                    <div className="name">{translateItemName(item.name)}</div>
-                    {report.sudoNote && (
-                      <div className="skip-reason">
-                        需要管理员权限，未能预览。{" "}
+                    <div className="name">{title}</div>
+                    <div className="skip-reason">
+                      {skip.message}{" "}
+                      {skip.needsFullDiskAccess && (
                         <button
                           className="inline-link-btn"
                           onClick={() => void openFullDiskAccess()}
                         >
                           去授权
                         </button>
-                        {permissionError && <div className="permission-error">{permissionError}</div>}
-                      </div>
-                    )}
+                      )}
+                      {skip.needsFullDiskAccess && permissionError && (
+                        <div className="permission-error">{permissionError}</div>
+                      )}
+                    </div>
                   </div>
                   <span className="pill warn">已跳过</span>
                 </div>

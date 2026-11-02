@@ -10,6 +10,7 @@ import {
   translateItemName,
   translateFolderName,
   cleanTargetLabel,
+  describeCleanSkip,
 } from "../../i18n/zh-CN";
 import { parseUninstallPreview } from "../mole";
 
@@ -85,6 +86,24 @@ describe("i18n 翻译层", () => {
     expect(cleanTargetLabel("/Users/x/fsCachedData")).toBe("fsCachedData");
     expect(cleanTargetLabel("/Users/x/HelpCache.plist")).toBe("HelpCache.plist");
     expect(cleanTargetLabel("/Users/x/Library/Caches")).toBe("缓存");
+  });
+
+  it("区分完全磁盘访问与登录项目标缺失", () => {
+    expect(
+      describeCleanSkip("Trash · skipped, grant Full Disk Access to your terminal"),
+    ).toEqual({
+      message: "需要完全磁盘访问权限才能预览这项内容。",
+      needsFullDiskAccess: true,
+    });
+    expect(
+      describeCleanSkip(
+        "Stale login item · ~/Library/LaunchAgents/netdisk_service.plist · Missing app/helper target: /Applications/BaiduNetdisk_mac.app/Contents/Frameworks/netdisk_service · review before removing",
+      ),
+    ).toEqual({
+      message:
+        "缺少应用目标：/Applications/BaiduNetdisk_mac.app/Contents/Frameworks/netdisk_service。应用可能已被移动或卸载，确认后可移除。",
+      needsFullDiskAccess: false,
+    });
   });
 });
 

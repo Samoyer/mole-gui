@@ -111,6 +111,44 @@ export function translateItemName(name: string): string {
   return restZh ? `${headZh} · ${restZh}` : headZh;
 }
 
+export type CleanSkipInfo = {
+  message: string;
+  needsFullDiskAccess: boolean;
+};
+
+// Mole 的 "skipped" 有多种原因，不能因为全局出现 "need sudo"
+// 就把每个跳过项都误标成权限不足。
+export function describeCleanSkip(name: string): CleanSkipInfo {
+  if (/full disk access|operation not permitted|permission denied/i.test(name)) {
+    return {
+      message: "需要完全磁盘访问权限才能预览这项内容。",
+      needsFullDiskAccess: true,
+    };
+  }
+
+  const missingTarget = name.match(
+    /Missing app\/helper target:\s*(.+?)(?:\s*·\s*review before removing)?$/i,
+  );
+  if (missingTarget) {
+    return {
+      message: `缺少应用目标：${missingTarget[1].trim()}。应用可能已被移动或卸载，确认后可移除。`,
+      needsFullDiskAccess: false,
+    };
+  }
+
+  if (/review before removing/i.test(name)) {
+    return {
+      message: "Mole 建议确认项目用途后再移除。",
+      needsFullDiskAccess: false,
+    };
+  }
+
+  return {
+    message: "Mole 已跳过此项目，本次不会清理。",
+    needsFullDiskAccess: false,
+  };
+}
+
 /* ---------- 磁盘分析：目录名 ---------- */
 
 const FOLDER_MAP: Record<string, string> = {
