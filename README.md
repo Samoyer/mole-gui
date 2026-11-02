@@ -18,8 +18,6 @@
 
 ## 界面示例
 
-> 以下截图均由 [合成示例页面](docs/showcase.html) 生成。示例数据不包含用户的真实文件、应用列表、目录路径或扫描结果。
-
 | 状态总览 | 深度清理 |
 | --- | --- |
 | ![状态总览示例](docs/screenshots/status.png) | ![深度清理示例](docs/screenshots/clean.png) |
