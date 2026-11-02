@@ -7,8 +7,11 @@ export const moVersion = () => invoke<string>("mo_version");
 export const moStatus = () => invoke<string>("mo_status");
 export const moStatusWatchStart = () => invoke<void>("mo_status_watch_start");
 export const moStatusWatchStop = () => invoke<void>("mo_status_watch_stop");
-export const moCleanPreview = (id: number) => invoke<string>("mo_clean_preview", { id });
-export const moCleanRun = (id: number) => invoke<string>("mo_clean_run", { id });
+export const moCleanPreview = (id: number) =>
+  invoke<CleanPreviewResult>("mo_clean_preview", { id });
+export const moCleanTargets = () => invoke<CleanTarget[]>("mo_clean_targets");
+export const moCleanRun = (id: number, selectedPaths: string[]) =>
+  invoke<string>("mo_clean_run", { id, selectedPaths });
 export const moUninstallList = (id: number) => invoke<string>("mo_uninstall_list", { id });
 export const moUninstallPreview = (name: string, id: number) =>
   invoke<string>("mo_uninstall_preview", { name, id });
@@ -260,6 +263,21 @@ export interface CleanItem {
   sizeText: string | null;
 }
 
+export interface CleanTarget {
+  path: string;
+  section: string;
+  bytes: number | null;
+  sizeText: string | null;
+  itemCount: number;
+  sizeKnown: boolean;
+  coveredBy: string | null;
+}
+
+export interface CleanPreviewResult {
+  output: string;
+  targets: CleanTarget[];
+}
+
 export interface CleanCategory {
   name: string;
   items: CleanItem[];
@@ -271,6 +289,32 @@ export interface CleanReport {
   categories: CleanCategory[];
   totalBytes: number;
   cleanableCount: number;
+  targets?: CleanTarget[];
+}
+
+export function isPathWithin(path: string, parent: string): boolean {
+  return path === parent || path.startsWith(parent.endsWith("/") ? parent : `${parent}/`);
+}
+
+export function selectableCleanTargets(targets: CleanTarget[]): CleanTarget[] {
+  return targets.filter(
+    (target) =>
+      !target.coveredBy &&
+      !targets.some(
+        (candidate) =>
+          candidate.path !== target.path && isPathWithin(target.path, candidate.path),
+      ),
+  );
+}
+
+export function selectedCleanBytes(
+  targets: CleanTarget[],
+  selectedPaths: string[],
+): number {
+  return targets.reduce((sum, target) => {
+    const selected = selectedPaths.some((path) => isPathWithin(target.path, path));
+    return selected && target.bytes !== null ? sum + target.bytes : sum;
+  }, 0);
 }
 
 const SIZE_RE = /([\d.]+)\s*(B|KB|MB|GB|TB)\b/i;

@@ -9,6 +9,7 @@ import {
   translateScanLabel,
   translateItemName,
   translateFolderName,
+  cleanTargetLabel,
 } from "../../i18n/zh-CN";
 import { parseUninstallPreview } from "../mole";
 
@@ -78,6 +79,12 @@ describe("i18n 翻译层", () => {
     expect(translateFolderName("System Library")).toBe("系统资源库");
     expect(translateFolderName("uv Cache")).toBe("Python 工具缓存");
     expect(translateFolderName("MyProject")).toBe("MyProject");
+  });
+
+  it("清理目标只映射完整名称，不改写文件名内部", () => {
+    expect(cleanTargetLabel("/Users/x/fsCachedData")).toBe("fsCachedData");
+    expect(cleanTargetLabel("/Users/x/HelpCache.plist")).toBe("HelpCache.plist");
+    expect(cleanTargetLabel("/Users/x/Library/Caches")).toBe("缓存");
   });
 });
 

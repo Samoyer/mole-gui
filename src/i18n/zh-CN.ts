@@ -143,6 +143,21 @@ export function translateFolderName(name: string): string {
   return name;
 }
 
+// 清理目标以真实路径为数据键，但界面只展示最后一级的自然名称；
+// 完整路径放在悬停提示里，避免长路径撑坏布局。
+export function cleanTargetLabel(path: string): string {
+  const segment = path.split("/").filter(Boolean).pop() ?? path;
+  let decoded = segment;
+  try {
+    decoded = decodeURIComponent(segment);
+  } catch {
+    // 文件系统名称不是 URI 编码时保持原样。
+  }
+  // 只映射完整名称。路径最后一段通常是文件名或 bundle id，
+  // 不能在单词内部替换 "cache"/"logs"（例如 fsCachedData）。
+  return ITEM_MAP[decoded] ?? FOLDER_MAP[decoded] ?? decoded;
+}
+
 /* ---------- 通用 UI 词条 ---------- */
 
 const UI_MAP: Record<string, string> = {

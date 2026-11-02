@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   formatBytes,
   formatRate,
+  isPathWithin,
   parseCleanPreview,
   parseJson,
+  selectableCleanTargets,
+  selectedCleanBytes,
   uninstallRunFailed,
 } from "../mole";
 
@@ -80,6 +83,56 @@ describe("parseCleanPreview", () => {
     const report = parseCleanPreview("");
     expect(report.categories).toEqual([]);
     expect(report.totalBytes).toBe(0);
+  });
+});
+
+describe("clean target selection", () => {
+  const targets = [
+    {
+      path: "/Users/me/Library/Caches/App",
+      section: "User essentials",
+      bytes: 1024,
+      sizeText: "1KB",
+      itemCount: 1,
+      sizeKnown: true,
+      coveredBy: null,
+    },
+    {
+      path: "/Users/me/Library/Caches/App/sub",
+      section: "User essentials",
+      bytes: 2048,
+      sizeText: "2KB",
+      itemCount: 1,
+      sizeKnown: true,
+      coveredBy: null,
+    },
+    {
+      path: "/Users/me/.npm/_logs",
+      section: "Developer tools",
+      bytes: 4096,
+      sizeText: "4KB",
+      itemCount: 2,
+      sizeKnown: true,
+      coveredBy: null,
+    },
+  ];
+
+  it("recognizes path ancestry without prefix collisions", () => {
+    expect(isPathWithin("/a/b/c", "/a/b")).toBe(true);
+    expect(isPathWithin("/a/b", "/a/b")).toBe(true);
+    expect(isPathWithin("/a/beta", "/a/b")).toBe(false);
+  });
+
+  it("only makes disjoint top-level paths selectable", () => {
+    expect(selectableCleanTargets(targets).map((target) => target.path)).toEqual([
+      "/Users/me/Library/Caches/App",
+      "/Users/me/.npm/_logs",
+    ]);
+  });
+
+  it("includes nested target bytes only once in selected totals", () => {
+    expect(selectedCleanBytes(targets, ["/Users/me/Library/Caches/App"])).toBe(3072);
+    expect(selectedCleanBytes(targets, ["/Users/me/.npm/_logs"])).toBe(4096);
   });
 });
 
