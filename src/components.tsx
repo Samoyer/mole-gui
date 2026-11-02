@@ -83,6 +83,19 @@ export const IconReveal = ({ size }: IconProps = {}) => (
   </svg>
 );
 
+export const IconMoon = ({ size }: IconProps = {}) => (
+  <svg {...base(size)}>
+    <path d="M20 15.2A8.5 8.5 0 0 1 8.8 4a8.6 8.6 0 1 0 11.2 11.2z" />
+  </svg>
+);
+
+export const IconSun = ({ size }: IconProps = {}) => (
+  <svg {...base(size)}>
+    <circle cx="12" cy="12" r="3.8" />
+    <path d="M12 2.5v2M12 19.5v2M4.3 4.3l1.4 1.4M18.3 18.3l1.4 1.4M2.5 12h2M19.5 12h2M4.3 19.7l1.4-1.4M18.3 5.7l1.4-1.4" />
+  </svg>
+);
+
 /* ---------- Health ring ---------- */
 
 export function Ring({

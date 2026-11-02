@@ -4,6 +4,7 @@ import App from "./App";
 import "./sunny-preview.css";
 import "./liquid-glass.css";
 import "./mo-extra.css";
+import "./apple-hig.css";
 import { configureAppearance } from "./AppearancePicker";
 
 // Sunny UI 2.0 四维外观系统：明暗 / 质感 / 配色 / 圆角

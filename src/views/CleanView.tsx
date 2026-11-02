@@ -9,7 +9,7 @@ import {
   parseCleanPreview,
   type CleanReport,
 } from "../lib/mole";
-import { ConfirmSheet, ScanProgress } from "../components";
+import { ConfirmSheet, ScanProgress, IconSparkle } from "../components";
 import { navigate, consumeNavParams } from "../lib/nav";
 import { translateCategory, translateItemName } from "../i18n/zh-CN";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -187,7 +187,7 @@ export default function CleanView() {
     return (
       <div className="clean-empty-center" data-drag>
         <div className="clean-hero-empty">
-          <div className="empty-icon">🧹</div>
+          <div className="empty-icon"><IconSparkle size={26} /></div>
           <div className="empty-title">尚未扫描</div>
           <div className="desc">扫描缓存、日志和临时文件，找出可安全清理的内容</div>
           <button className="btn primary" onClick={() => startScan(true)}>开始扫描</button>

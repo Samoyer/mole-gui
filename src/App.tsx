@@ -5,9 +5,12 @@ import { currentNav, subscribeNav, type NavKey as StoreNavKey } from "./lib/nav"
 import {
   IconDisk,
   IconGauge,
+  IconMoon,
   IconSparkle,
+  IconSun,
   IconTrash,
 } from "./components";
+import moleLogo from "./assets/mole-logo.png";
 import StatusView from "./views/StatusView";
 import CleanView from "./views/CleanView";
 import UninstallView from "./views/UninstallView";
@@ -76,10 +79,12 @@ export default function App() {
     <div className="app">
       <aside className="sidebar" data-drag>
         <div className="brand">
-          <div className="brand-mark"><span style={{ fontSize: 20, fontWeight: 800 }}>M</span></div>
+          <div className="brand-mark">
+            <img className="brand-logo" src={moleLogo} alt="" draggable={false} />
+          </div>
           <div className="brand-text">
             <strong>Mole</strong>
-            <small>MAC 工具箱</small>
+            <small>Mac 工具箱</small>
           </div>
         </div>
         <nav className="nav">
@@ -94,7 +99,7 @@ export default function App() {
             aria-label="切换外观"
             onClick={() => setTheme(theme === "light" ? "dark" : "light")}
           >
-            {theme === "light" ? "🌙" : "☀️"}
+            {theme === "light" ? <IconMoon size={14} /> : <IconSun size={14} />}
           </button>
           <div className="version">{version}</div>
         </div>
@@ -107,7 +112,7 @@ export default function App() {
           </div>
         </header>
 
-        <main className="content" style={{ padding: "22px 26px 34px", maxWidth: 1560, width: "100%" }}>
+        <main className="content" style={{ width: "100%" }}>
           <div className="page-body" key={nav}>
             {nav === "status" && <StatusView />}
             {nav === "clean" && <CleanView />}

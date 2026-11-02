@@ -18,7 +18,7 @@ import {
 import { getAppsCache, setAppsCache } from "../lib/cache";
 import { navigate } from "../lib/nav";
 import { formatLastUsedZh } from "../i18n/zh-CN";
-import { ConfirmSheet, IconSearch } from "../components";
+import { ConfirmSheet, IconSearch, IconTrash } from "../components";
 
 type Phase = "loading" | "ready" | "confirm" | "running";
 
@@ -189,13 +189,14 @@ export default function UninstallView() {
 
   if (phase === "loading") {
     return (
-      <section className="panel" data-drag>
+      <div className="clean-empty-center" data-drag>
         <div className="clean-hero-empty">
-          <div className="big">尚未读取应用列表</div>
+          <div className="empty-icon"><IconTrash size={26} /></div>
+          <div className="empty-title">尚未读取应用列表</div>
           <div className="desc">读取需要几秒钟，之后可搜索并卸载应用</div>
           <button className="btn primary" onClick={() => { setPhase("ready"); refresh(); }}>读取应用列表</button>
         </div>
-      </section>
+      </div>
     );
   }
 
@@ -232,7 +233,6 @@ export default function UninstallView() {
                   key={app.path}
                   style={{
                     cursor: "pointer",
-                    background: selected?.path === app.path ? "var(--mat-active-bg)" : undefined,
                     borderRadius: `calc(12px * var(--corner-scale, 1))`,
                     padding: "10px 12px",
                     margin: "-1px -1px",
@@ -262,7 +262,7 @@ export default function UninstallView() {
 
         <div style={{ minWidth: 0 }}>
           {!selected && !result && (
-            <section className="panel panel-pad" data-drag>
+            <section className="panel panel-pad uninstall-detail-panel uninstall-detail-empty" data-drag>
               <div className="clean-hero-empty">
                 <div className="big" style={{ fontSize: 15 }}>在左侧选择一个应用</div>
                 <div className="desc">或把 .app 从访达拖进窗口，选中后会显示卸载预览</div>
@@ -272,7 +272,7 @@ export default function UninstallView() {
           )}
 
           {selected && (
-            <section className="panel panel-pad" data-drag>
+            <section className="panel panel-pad uninstall-detail-panel" data-drag>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
                 <div style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-0.015em" }}>{selected.name}</div>
                 <span className={`pill ${selected.source === "App Store" ? "info" : "idle"}`}>{selected.bundle_id || selected.source}</span>
