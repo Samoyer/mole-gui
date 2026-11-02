@@ -352,12 +352,21 @@ html[data-theme="dark"] .mrow.clickable:hover:not(.selected) { background: rgba(
 .clean-hero-empty .big { font-size: 32px; font-weight: 600; }
 
 /* ---------- 仪表盘 ---------- */
-.dash-card {
-  border: 0;
+.dash-grid {
+  gap: 0;
+  overflow: hidden;
   border-radius: 12px;
-  padding: 18px 20px;
+  background: var(--surface);
   box-shadow: inset 0 0 0 0.5px var(--separator), 0 1px 2px rgba(0, 0, 0, 0.035);
 }
+.dash-card {
+  border: 0;
+  border-radius: 0;
+  padding: 18px 20px;
+  background: transparent;
+  box-shadow: none;
+}
+.dash-card + .dash-card { border-left: 1px solid var(--line); }
 .dash-title { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0.01em; }
 .stat-num-lg {
   font-size: 30px;
@@ -463,6 +472,13 @@ html[data-theme="dark"] .pill.ok { background: rgba(255, 255, 255, 0.08); }
   .content { padding: 18px 16px 32px; }
   .uninstall-detail-panel,
   .split-view > div > .panel { min-height: 260px; }
+}
+
+@media (max-width: 860px) {
+  .dash-card + .dash-card {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
 }
 
 /* Sunny 在 1080px 会把侧栏收成图标轨并隐藏品牌/版本/主题按钮；
