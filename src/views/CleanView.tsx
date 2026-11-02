@@ -28,6 +28,8 @@ import {
 type InitPhase = "init" | "scanning" | "preview" | "confirm" | "running" | "done";
 
 const MARK_TEXT = { clean: "↳", ok: "✓", skip: "◎", info: "i" } as const;
+const FULL_DISK_ACCESS_URL =
+  "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles";
 
 // 扫描/清理状态放在模块级 store：切到其他 tab 时 CleanView 卸载，
 // 但任务在后台继续跑，回来时进度和结果都还在。
@@ -152,9 +154,21 @@ export default function CleanView({
 }) {
   const snap = useSyncExternalStore(subscribeClean, getCleanSnapshot);
   const [focus, setFocus] = useState<string | null>(null);
+  const [permissionError, setPermissionError] = useState<string | null>(null);
   const blocked = isMoCompatibilityBlocked(compatibility);
   const beginScan = () => {
     if (!blocked) startScan(true);
+  };
+  const openFullDiskAccess = async () => {
+    setPermissionError(null);
+    try {
+      await openUrl(FULL_DISK_ACCESS_URL);
+    } catch (error) {
+      console.error("[opener] failed to open Full Disk Access settings", error);
+      setPermissionError(
+        "未能自动打开系统设置，请手动前往「系统设置 → 隐私与安全性 → 完全磁盘访问」。",
+      );
+    }
   };
 
   // 任务链入口：其他页面带 focus 参数跳来时，只显示对应分类
@@ -291,10 +305,11 @@ export default function CleanView({
                         需要管理员权限，未能预览。{" "}
                         <button
                           className="inline-link-btn"
-                          onClick={() => openUrl("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles").catch(() => {})}
+                          onClick={() => void openFullDiskAccess()}
                         >
                           去授权
                         </button>
+                        {permissionError && <div className="permission-error">{permissionError}</div>}
                       </div>
                     )}
                     </div>

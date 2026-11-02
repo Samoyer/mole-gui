@@ -256,6 +256,13 @@ html[data-theme="dark"] .nav-item.active { background: rgba(255, 255, 255, 0.12)
 html[data-theme="dark"] .compat-banner.warning { background: rgba(255, 159, 10, 0.12); }
 html[data-theme="dark"] .compat-banner.danger { background: rgba(255, 59, 48, 0.12); }
 
+.permission-error {
+  margin-top: 5px;
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 /* ---------- 面板（唯一卡片表面） ---------- */
 .panel {
   background: var(--surface);
