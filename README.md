@@ -20,11 +20,11 @@
 
 | 状态总览 | 深度清理 |
 | --- | --- |
-| ![状态总览示例](https://raw.githubusercontent.com/Samoyer/mole-gui/main/docs/screenshots/status.png) | ![深度清理示例](https://raw.githubusercontent.com/Samoyer/mole-gui/main/docs/screenshots/clean.png) |
+| ![状态总览示例](https://fastly.jsdelivr.net/gh/Samoyer/mole-gui@main/docs/screenshots/status.png) | ![深度清理示例](https://fastly.jsdelivr.net/gh/Samoyer/mole-gui@main/docs/screenshots/clean.png) |
 
 | 应用卸载 | 磁盘分析 |
 | --- | --- |
-| ![应用卸载示例](https://raw.githubusercontent.com/Samoyer/mole-gui/main/docs/screenshots/uninstall.png) | ![磁盘分析示例](https://raw.githubusercontent.com/Samoyer/mole-gui/main/docs/screenshots/analyze.png) |
+| ![应用卸载示例](https://fastly.jsdelivr.net/gh/Samoyer/mole-gui@main/docs/screenshots/uninstall.png) | ![磁盘分析示例](https://fastly.jsdelivr.net/gh/Samoyer/mole-gui@main/docs/screenshots/analyze.png) |
 
 ## 兼容性
 
