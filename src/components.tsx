@@ -96,6 +96,13 @@ export const IconSun = ({ size }: IconProps = {}) => (
   </svg>
 );
 
+export const IconInfo = ({ size }: IconProps = {}) => (
+  <svg {...base(size)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 10.5v5.5M12 7.5h.01" />
+  </svg>
+);
+
 /* ---------- Health ring ---------- */
 
 export function Ring({

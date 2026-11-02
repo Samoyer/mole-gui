@@ -21,6 +21,7 @@ import Treemap from "../components/Treemap";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { navigate, consumeNavParams } from "../lib/nav";
 import { translateFolderName } from "../i18n/zh-CN";
+import { validateAnalyzePayload } from "../lib/moCompatibility";
 
 interface Crumb {
   label: string;
@@ -105,6 +106,11 @@ export default function AnalyzeView() {
     try {
       const raw = await moAnalyze(path ?? undefined, id);
       const parsed = parseJson<AnalyzeData>(raw);
+      const contractIssues = validateAnalyzePayload(parsed);
+      if (contractIssues.length > 0) {
+        console.warn("[mo-contract] analyze payload mismatch:", contractIssues);
+        throw new Error("Mole 的磁盘分析数据格式与当前界面不兼容，请使用已验证的 Mole 1.66.x。");
+      }
       setAnalyzeCached(key, parsed);
       persistAnalyze(key, parsed);
       setStaleAt(null);

@@ -62,11 +62,14 @@ fn find_mo() -> Result<PathBuf, String> {
     Err("未找到 mo 命令，请先安装 Mole：brew install mole".to_string())
 }
 
-fn run_mo(args: &[&str], stdin_text: Option<&str>) -> Result<String, String> {
-    let mo = find_mo()?;
+fn run_mo_with_path(
+    mo: &PathBuf,
+    args: &[&str],
+    stdin_text: Option<&str>,
+) -> Result<String, String> {
     // nice 大幅降低 mo 子进程的 CPU 优先级，避免采集时抢占 UI 渲染
     let mut cmd = Command::new("/usr/bin/nice");
-    cmd.args(["-n", "10"]).arg(&mo).args(args);
+    cmd.args(["-n", "10"]).arg(mo).args(args);
     cmd.stdin(if stdin_text.is_some() {
         std::process::Stdio::piped()
     } else {
@@ -170,7 +173,16 @@ fn strip_ansi(text: &str) -> String {
 }
 
 fn run_mo_clean(args: &[&str], stdin_text: Option<&str>) -> Result<String, String> {
-    run_mo(args, stdin_text).map(|s| strip_ansi(&s))
+    let mo = find_mo()?;
+    run_mo_clean_with_path(&mo, args, stdin_text)
+}
+
+fn run_mo_clean_with_path(
+    mo: &PathBuf,
+    args: &[&str],
+    stdin_text: Option<&str>,
+) -> Result<String, String> {
+    run_mo_with_path(mo, args, stdin_text).map(|s| strip_ansi(&s))
 }
 
 fn spawn_nice(
@@ -750,6 +762,36 @@ fn cache_file(name: &str) -> Result<PathBuf, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    struct FakeMo {
+        dir: PathBuf,
+        path: PathBuf,
+    }
+
+    impl Drop for FakeMo {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    fn fake_mo(body: &str) -> FakeMo {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "mole-gui-test-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("mo");
+        std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+        let mut permissions = std::fs::metadata(&path).unwrap().permissions();
+        permissions.set_mode(0o755);
+        std::fs::set_permissions(&path, permissions).unwrap();
+        FakeMo { dir, path }
+    }
 
     #[test]
     fn strip_ansi_removes_csi_sequences() {
@@ -786,6 +828,37 @@ mod tests {
         assert_ne!(a, b);
         let a2 = cache_file("A B").unwrap();
         assert_eq!(a, a2);
+    }
+
+    #[test]
+    fn fake_mo_verifies_process_output_and_ansi_stripping() {
+        let fake = fake_mo("printf '\\033[32mMole version 1.66.0\\033[0m\\n'");
+        let output = run_mo_clean_with_path(&fake.path, &["--version"], None).unwrap();
+        assert_eq!(output.trim(), "Mole version 1.66.0");
+    }
+
+    #[test]
+    fn fake_mo_verifies_noninteractive_spawn() {
+        let fake = fake_mo("printf 'plain-ok\\n'");
+        let mut child = spawn_nice(&fake.path, &[], false).unwrap();
+        let mut stdout = child.stdout.take().unwrap();
+        let mut output = String::new();
+        stdout.read_to_string(&mut output).unwrap();
+        let status = child.wait().unwrap();
+        assert!(status.success());
+        assert_eq!(output.trim(), "plain-ok");
+    }
+
+    #[test]
+    fn fake_mo_verifies_pty_spawn() {
+        let fake = fake_mo("printf 'pty-ok\\n'");
+        let mut child = spawn_nice_pty(&fake.path, &[]).unwrap();
+        let mut stdout = child.stdout.take().unwrap();
+        let mut output = String::new();
+        stdout.read_to_string(&mut output).unwrap();
+        let status = child.wait().unwrap();
+        assert!(status.success());
+        assert!(output.contains("pty-ok"));
     }
 }
 

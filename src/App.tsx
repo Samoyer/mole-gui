@@ -5,12 +5,19 @@ import { currentNav, subscribeNav, type NavKey as StoreNavKey } from "./lib/nav"
 import {
   IconDisk,
   IconGauge,
+  IconInfo,
   IconMoon,
   IconSparkle,
   IconSun,
   IconTrash,
 } from "./components";
 import moleLogo from "./assets/mole-logo.png";
+import {
+  assessMoCompatibility,
+  missingMoCompatibility,
+  TESTED_MO_VERSION,
+  type MoCompatibility,
+} from "./lib/moCompatibility";
 import StatusView from "./views/StatusView";
 import CleanView from "./views/CleanView";
 import UninstallView from "./views/UninstallView";
@@ -33,9 +40,40 @@ const TITLES: Record<NavKey, { title: string; subtitle: string }> = {
   analyze: { title: "磁盘分析", subtitle: "逐级查看磁盘空间占用" },
 };
 
+function compatibilityNotice(compatibility: MoCompatibility | null) {
+  if (!compatibility || compatibility.status === "supported") return null;
+  if (compatibility.status === "missing") {
+    return {
+      tone: "danger",
+      title: "未找到 Mole",
+      detail: "请先安装 Mole，界面中的扫描与清理功能暂时不可用。",
+    };
+  }
+  if (compatibility.status === "unknown") {
+    return {
+      tone: "warning",
+      title: "无法识别 Mole 版本",
+      detail: `当前界面针对 Mole ${TESTED_MO_VERSION}.x 验证，部分功能可能无法正常显示。`,
+    };
+  }
+  if (compatibility.status === "unsupported") {
+    return {
+      tone: "danger",
+      title: `Mole ${compatibility.version} 尚未兼容`,
+      detail: `当前版本已验证 Mole ${TESTED_MO_VERSION}.x，请切换版本后再执行清理或卸载。`,
+    };
+  }
+  return {
+    tone: "warning",
+    title: `Mole ${compatibility.version} 尚未验证`,
+    detail: `当前输出契约针对 Mole ${TESTED_MO_VERSION}.x；新版本可能改变文案或数据结构。`,
+  };
+}
+
 export default function App() {
   const [nav, setNav] = useState<NavKey>(currentNav);
   const [version, setVersion] = useState("");
+  const [compatibility, setCompatibility] = useState<MoCompatibility | null>(null);
   const [theme, setTheme] = useAppearanceTheme();
 
   useEffect(() => subscribeNav((key) => setNav(key)), []);
@@ -55,8 +93,15 @@ export default function App() {
     window.addEventListener("mousedown", onMouseDown);
 
     moVersion()
-      .then((v) => setVersion(v.split("\n")[0].replace("Mole version ", "Mole v")))
-      .catch(() => setVersion("Mole 未安装"));
+      .then((raw) => {
+        const next = assessMoCompatibility(raw);
+        setCompatibility(next);
+        setVersion(next.version ? `Mole v${next.version}` : "Mole 版本未知");
+      })
+      .catch(() => {
+        setCompatibility(missingMoCompatibility());
+        setVersion("Mole 未安装");
+      });
 
     moStatusWatchStart().catch(() => {});
     return () => {
@@ -74,6 +119,8 @@ export default function App() {
       <strong>{label}</strong>
     </button>
   );
+
+  const notice = compatibilityNotice(compatibility);
 
   return (
     <div className="app">
@@ -113,6 +160,15 @@ export default function App() {
         </header>
 
         <main className="content" style={{ width: "100%" }}>
+          {notice && (
+            <div className={`compat-banner ${notice.tone}`} role="status">
+              <span className="compat-icon"><IconInfo size={16} /></span>
+              <div>
+                <strong>{notice.title}</strong>
+                <span>{notice.detail}</span>
+              </div>
+            </div>
+          )}
           <div className="page-body" key={nav}>
             {nav === "status" && <StatusView />}
             {nav === "clean" && <CleanView />}
